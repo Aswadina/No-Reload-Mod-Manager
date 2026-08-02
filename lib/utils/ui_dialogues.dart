@@ -17,6 +17,7 @@ import 'package:no_reload_mod_manager/utils/keypress_simulator_manager.dart';
 import 'package:no_reload_mod_manager/utils/mod_manager.dart';
 import 'package:no_reload_mod_manager/utils/shared_pref.dart';
 import 'package:no_reload_mod_manager/utils/state_providers.dart';
+import 'package:no_reload_mod_manager/utils/managedfolder_watcher.dart';
 import 'package:path/path.dart' as p;
 
 class GenerateGroupIcoFileDialog extends ConsumerStatefulWidget {
@@ -431,41 +432,47 @@ class _OnDropFolderDialogState extends ConsumerState<OnDropModFolderDialog> {
   ];
 
   Future<bool> isValidFolder(Directory f) async {
-    if (widget.forRestorer ||
-        (!isUnderManagedFolder(f.path) &&
-            !isFolderOnThisToolPath(f) &&
-            !await isParentOfManagedFolder(f.path) &&
-            !isParentOfThisToolPath(f) &&
-            !isParentOfDestFolder(f))) {
-      return true;
-    }
+    try {
+      if (widget.forRestorer ||
+          (!isUnderManagedFolder(f.path) &&
+              !isFolderOnThisToolPath(f) &&
+              !await isParentOfManagedFolder(f.path) &&
+              !isParentOfThisToolPath(f) &&
+              !isParentOfDestFolder(f))) {
+        return true;
+      }
+    } catch (_) {}
     return false;
   }
 
   bool isUnderManagedFolder(String inputPath) {
-    var dir = Directory(p.normalize(inputPath));
+    try {
+      var dir = Directory(p.normalize(inputPath));
 
-    // Walk up to root
-    while (true) {
-      final folderName = p.basename(dir.path);
-      if (folderName.toLowerCase() == '_managed_') {
-        return true;
+      // Walk up to root
+      while (true) {
+        final folderName = p.basename(dir.path);
+        if (folderName.toLowerCase() == '_managed_') {
+          return true;
+        }
+
+        final parent = dir.parent;
+        if (parent.path == dir.path) break; // Reached root
+        dir = parent;
       }
-
-      final parent = dir.parent;
-      if (parent.path == dir.path) break; // Reached root
-      dir = parent;
-    }
+    } catch (_) {}
 
     return false;
   }
 
   bool isFolderOnThisToolPath(Directory f) {
-    String thisToolExePath = Platform.resolvedExecutable;
-    String thisToolPath = p.dirname(thisToolExePath);
-    if (p.isWithin(thisToolPath, p.normalize(f.path))) {
-      return true;
-    }
+    try {
+      String thisToolExePath = Platform.resolvedExecutable;
+      String thisToolPath = p.dirname(thisToolExePath);
+      if (p.isWithin(thisToolPath, p.normalize(f.path))) {
+        return true;
+      }
+    } catch (_) {}
     return false;
   }
 
@@ -473,45 +480,51 @@ class _OnDropFolderDialogState extends ConsumerState<OnDropModFolderDialog> {
   /// Recursively checks if the given [dirPath] or any of its subdirectories
   /// contains a folder named '_MANAGED_' (case-insensitive).
   Future<bool> isParentOfManagedFolder(String dirPath) async {
-    final dir = Directory(
-      r"\\?\" + dirPath.replaceFirst(r"\\?\", ''),
-    ); // workaround \\?\ for long paths, only for Windows
+    try {
+      final dir = Directory(
+        r"\\?\" + dirPath.replaceFirst(r"\\?\", ''),
+      ); // workaround \\?\ for long paths, only for Windows
 
-    if (!await dir.exists()) return false;
+      if (!await dir.exists()) return false;
 
-    // Check if the base name of the given path is '_MANAGED_'
-    final currentName = p.basename(dirPath);
-    if (currentName.toLowerCase() == '_managed_') return true;
+      // Check if the base name of the given path is '_MANAGED_'
+      final currentName = p.basename(dirPath);
+      if (currentName.toLowerCase() == '_managed_') return true;
 
-    // Recursively list all subdirectories
-    await for (final entity in dir.list(recursive: true, followLinks: false)) {
-      if (entity is Directory) {
-        final folderName = p.basename(entity.path);
-        if (folderName.toLowerCase() == '_managed_') {
-          return true;
+      // Recursively list all subdirectories
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+        if (entity is Directory) {
+          final folderName = p.basename(entity.path);
+          if (folderName.toLowerCase() == '_managed_') {
+            return true;
+          }
         }
       }
-    }
+    } catch (_) {}
 
     return false;
   }
 
   bool isParentOfThisToolPath(Directory f) {
-    String thisToolExePath = Platform.resolvedExecutable;
-    String thisToolPath = p.dirname(thisToolExePath);
-    if (p.isWithin(f.path, p.normalize(thisToolPath)) ||
-        f.path == thisToolPath) {
-      return true;
-    }
+    try {
+      String thisToolExePath = Platform.resolvedExecutable;
+      String thisToolPath = p.dirname(thisToolExePath);
+      if (p.isWithin(f.path, p.normalize(thisToolPath)) ||
+          f.path == thisToolPath) {
+        return true;
+      }
+    } catch (_) {}
     return false;
   }
 
   bool isParentOfDestFolder(Directory f) {
-    if (widget.copyDestination != null) {
-      if (p.isWithin(f.path, p.normalize(widget.copyDestination!))) {
-        return true;
+    try {
+      if (widget.copyDestination != null) {
+        if (p.isWithin(f.path, p.normalize(widget.copyDestination!))) {
+          return true;
+        }
       }
-    }
+    } catch (_) {}
     return false;
   }
 
@@ -1056,7 +1069,10 @@ class _CopyModDialogState extends ConsumerState<CopyModDialog> {
       }
     }
 
+    String? watchedPath;
     if (proceed) {
+      watchedPath = DynamicDirectoryWatcher.watcher?.path;
+      DynamicDirectoryWatcher.stop();
       setState(() {
         contents = [];
         _showPasswordTextfield = false;
@@ -1069,42 +1085,52 @@ class _CopyModDialogState extends ConsumerState<CopyModDialog> {
       });
     }
 
-    List<TextSpan> operationLogs = [];
+    try {
+      List<TextSpan> operationLogs = [];
 
-    //MOD FOLDERs
-    for (var folder in widget.modDirs) {
-      Directory? disabledFolder = await renameSourceFolderToBeDisabledPrefix(
-        folder,
-      );
-      if (disabledFolder != null) {
-        String destFolderName = removeAllDisabledPrefixes(
-          p.basename(disabledFolder.path),
+      //MOD FOLDERs
+      for (var folder in widget.modDirs) {
+        Directory? disabledFolder = await renameSourceFolderToBeDisabledPrefix(
+          folder,
         );
-
-        try {
-          String destDirPath = p.join(widget.targetGroupPath, destFolderName);
-          destDirPath = await checkForDuplicateFolderName(destDirPath);
-
-          await copyDirectory(disabledFolder, Directory(destDirPath));
-
-          //Even though source folder already disabled, after successfully copied, just delete it. Actually just simulating cut/move.
-          //Rename source folder is also the same as testing whether that folder is used by other programs or not.
-          await deleteUnusedFolder(disabledFolder);
-
-          //make sure the mod folder directly contains files not another nested folder
-          await unwrapSingleFolderNesting(destDirPath);
-          operationLogs.add(
-            TextSpan(
-              text: 'Folder copied'.tr(args: [p.basename(folder.path)]),
-              style: GoogleFonts.poppins(
-                color: Colors.green,
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
+        if (disabledFolder != null) {
+          String destFolderName = removeAllDisabledPrefixes(
+            p.basename(disabledFolder.path),
           );
-          needUpdateModData = true;
-        } catch (_) {
+
+          try {
+            String destDirPath = p.join(widget.targetGroupPath, destFolderName);
+            destDirPath = await checkForDuplicateFolderName(destDirPath);
+
+            await copyDirectory(disabledFolder, Directory(destDirPath));
+
+            //Even though source folder already disabled, after successfully copied, just delete it. Actually just simulating cut/move.
+            //Rename source folder is also the same as testing whether that folder is used by other programs or not.
+            await deleteUnusedFolder(disabledFolder);
+
+            //make sure the mod folder directly contains files not another nested folder
+            await unwrapSingleFolderNesting(destDirPath);
+            operationLogs.add(
+              TextSpan(
+                text: 'Folder copied'.tr(args: [p.basename(folder.path)]),
+                style: GoogleFonts.poppins(
+                  color: Colors.green,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            );
+            needUpdateModData = true;
+          } catch (_) {
+            operationLogs.add(
+              TextSpan(
+                text:
+                    '${'Error! Cannot copy folder'.tr(args: [p.basename(folder.path)])}.\n${ConstantVar.defaultErrorInfo}\n\n',
+                style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
+              ),
+            );
+          }
+        } else {
           operationLogs.add(
             TextSpan(
               text:
@@ -1113,100 +1139,96 @@ class _CopyModDialogState extends ConsumerState<CopyModDialog> {
             ),
           );
         }
-      } else {
-        operationLogs.add(
-          TextSpan(
-            text:
-                '${'Error! Cannot copy folder'.tr(args: [p.basename(folder.path)])}.\n${ConstantVar.defaultErrorInfo}\n\n',
-            style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
-          ),
-        );
       }
-    }
 
-    //MOD ARCHIVEs
-    for (var archive in widget.modArchives) {
-      String destFolderName = removeAllDisabledPrefixes(
-        p.basenameWithoutExtension(archive.path),
-      );
-      try {
-        //group_x/archiveName
-        String destDirPath = p.join(widget.targetGroupPath, destFolderName);
-        destDirPath = await checkForDuplicateFolderName(destDirPath);
-
-        //extract
-        final extractResult = await SevenZip.instance.extract(
-          archive.path,
-          outputDir: destDirPath,
-          password: passwordedArchives[archive.path] ?? '',
+      //MOD ARCHIVEs
+      for (var archive in widget.modArchives) {
+        String destFolderName = removeAllDisabledPrefixes(
+          p.basenameWithoutExtension(archive.path),
         );
+        try {
+          //group_x/archiveName
+          String destDirPath = p.join(widget.targetGroupPath, destFolderName);
+          destDirPath = await checkForDuplicateFolderName(destDirPath);
 
-        if (extractResult.success) {
-          //make sure the mod folder directly contains files not another nested folder
-          await unwrapSingleFolderNesting(destDirPath);
-        } else {
-          try {
-            await Directory(
-              r"\\?\" + destDirPath.replaceFirst(r"\\?\", ''),
-            ).delete(
-              recursive: true,
-            ); // workaround \\?\ for long paths, only for Windows
-          } catch (_) {}
-          if (extractResult.wrongPassword) {
-            throw Exception("Wrong password");
+          //extract
+          final extractResult = await SevenZip.instance.extract(
+            archive.path,
+            outputDir: destDirPath,
+            password: passwordedArchives[archive.path] ?? '',
+          );
+
+          if (extractResult.success) {
+            //make sure the mod folder directly contains files not another nested folder
+            await unwrapSingleFolderNesting(destDirPath);
           } else {
-            throw Exception("Failed to extract");
+            try {
+              await Directory(
+                r"\\?\" + destDirPath.replaceFirst(r"\\?\", ''),
+              ).delete(
+                recursive: true,
+              ); // workaround \\?\ for long paths, only for Windows
+            } catch (_) {}
+            if (extractResult.wrongPassword) {
+              throw Exception("Wrong password");
+            } else {
+              throw Exception("Failed to extract");
+            }
+          }
+
+          operationLogs.add(
+            TextSpan(
+              text: 'Archive extracted'.tr(args: [p.basename(archive.path)]),
+              style: GoogleFonts.poppins(
+                color: Colors.green,
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          );
+          needUpdateModData = true;
+        } catch (e) {
+          if (e.toString().contains("Wrong password")) {
+            operationLogs.add(
+              TextSpan(
+                text: 'Archive wrong password'.tr(
+                  args: [p.basename(archive.path)],
+                ),
+                style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
+              ),
+            );
+          } else if (e.toString().contains("Failed to extract")) {
+            operationLogs.add(
+              TextSpan(
+                text: 'Error! Archive not supported'.tr(
+                  args: [p.basename(archive.path)],
+                ),
+                style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
+              ),
+            );
+          } else {
+            operationLogs.add(
+              TextSpan(
+                text:
+                    '${'Error! Cannot extract mod archive'.tr(args: [p.basename(archive.path)])}.\n${ConstantVar.defaultErrorInfo}\n\n',
+                style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
+              ),
+            );
           }
         }
+      }
 
-        operationLogs.add(
-          TextSpan(
-            text: 'Archive extracted'.tr(args: [p.basename(archive.path)]),
-            style: GoogleFonts.poppins(
-              color: Colors.green,
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        );
-        needUpdateModData = true;
-      } catch (e) {
-        if (e.toString().contains("Wrong password")) {
-          operationLogs.add(
-            TextSpan(
-              text: 'Archive wrong password'.tr(
-                args: [p.basename(archive.path)],
-              ),
-              style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
-            ),
-          );
-        } else if (e.toString().contains("Failed to extract")) {
-          operationLogs.add(
-            TextSpan(
-              text: 'Error! Archive not supported'.tr(
-                args: [p.basename(archive.path)],
-              ),
-              style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
-            ),
-          );
-        } else {
-          operationLogs.add(
-            TextSpan(
-              text:
-                  '${'Error! Cannot extract mod archive'.tr(args: [p.basename(archive.path)])}.\n${ConstantVar.defaultErrorInfo}\n\n',
-              style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
-            ),
-          );
-        }
+      setState(() {
+        _showClose = true;
+        contents = operationLogs;
+      });
+
+      await _scrollToBottom();
+    } finally {
+      if (proceed && watchedPath != null) {
+        DynamicDirectoryWatcher.watch(watchedPath);
       }
     }
-
-    setState(() {
-      _showClose = true;
-      contents = operationLogs;
-    });
-
-    await _scrollToBottom();
   }
 
   Future<Directory?> renameSourceFolderToBeDisabledPrefix(

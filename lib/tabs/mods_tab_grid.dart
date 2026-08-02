@@ -232,11 +232,6 @@ class _ModAreaGridState extends ConsumerState<ModAreaGrid>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToItem(widget.currentGroupData.previousSelectedModOnGroup);
     });
-    ref.listenManual(currentGroupIndexProvider, (previous, next) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToItem(widget.currentGroupData.previousSelectedModOnGroup);
-      });
-    });
     ModNavigationListener.addListener(this);
   }
 
@@ -261,6 +256,18 @@ class _ModAreaGridState extends ConsumerState<ModAreaGrid>
   @override
   Widget build(BuildContext context) {
     double sss = ref.watch(zoomScaleProvider);
+
+    ref.listen(currentGroupIndexProvider, (previous, next) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToItem(widget.currentGroupData.previousSelectedModOnGroup);
+      });
+    });
+    ref.listen(modGroupDataProvider, (previous, next) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToItem(widget.currentGroupData.previousSelectedModOnGroup);
+      });
+    });
+
     _itemKeys = List.generate(
       widget.currentGroupData.modsInGroup.length,
       (_) => GlobalKey(),
@@ -428,10 +435,12 @@ class _GroupAreaState extends ConsumerState<GroupAreaGrid>
   int currentPageIndex = 0;
   bool isHoveringGroupName = false;
   double windowWidth = 0;
+  int? _lastCarouselPageIndex;
 
   @override
   void initState() {
     super.initState();
+    _lastCarouselPageIndex = widget.initialGroupIndex;
     getCurrentGroupName(widget.initialGroupIndex, calledFromInitState: true);
     ModNavigationListener.addListener(this);
     ModSearcherListener.addListener(this);
@@ -526,6 +535,24 @@ class _GroupAreaState extends ConsumerState<GroupAreaGrid>
   @override
   Widget build(BuildContext context) {
     final sss = ref.watch(zoomScaleProvider);
+
+    ref.listen(currentGroupIndexProvider, (previous, next) {
+      if (next >= 0 && next < ref.read(modGroupDataProvider).length && next != _lastCarouselPageIndex) {
+        _carouselSliderGroupController.jumpToPage(next);
+        _lastCarouselPageIndex = next;
+        getCurrentGroupName(next);
+      }
+    });
+
+    ref.listen(modGroupDataProvider, (previous, next) {
+      final index = ref.read(currentGroupIndexProvider);
+      if (index >= 0 && index < next.length && index != _lastCarouselPageIndex) {
+        _carouselSliderGroupController.jumpToPage(index);
+        _lastCarouselPageIndex = index;
+        getCurrentGroupName(index);
+      }
+    });
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -638,6 +665,7 @@ class _GroupAreaState extends ConsumerState<GroupAreaGrid>
                       enableInfiniteScroll: false,
                       scrollDirection: Axis.horizontal,
                       onPageChanged: (index, reason, realIndex) {
+                        _lastCarouselPageIndex = index;
                         getCurrentGroupName(index);
                       },
                       scrollPhysics:
@@ -648,7 +676,9 @@ class _GroupAreaState extends ConsumerState<GroupAreaGrid>
                       viewportFraction: getViewportFraction(),
                     ),
                     itemBuilder: (context, index, realIndex) {
+                      final groupData = ref.watch(modGroupDataProvider)[index];
                       return RightClickMenuRegion(
+                        key: ValueKey('group_region_${groupData.groupName}'),
                         menuItems: [
                           CustomMenuItem(
                             scale: sss,
@@ -967,37 +997,86 @@ class _GroupAreaState extends ConsumerState<GroupAreaGrid>
                             label: 'Remove group'.tr(),
                           ),
                         ],
-                        child: Tooltip(
-                          textAlign: TextAlign.center,
-                          message:
-                              "${ref.read(modGroupDataProvider)[index].groupName}\n${p.basename(ref.read(modGroupDataProvider)[index].groupDir.path)}",
-                          waitDuration: Duration(milliseconds: 500),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              GroupContainer(
-                                index: index,
-                                currentIndex: currentPageIndex,
-                                size: index == currentPageIndex ? 80 : 65,
-                                selectedColor:
-                                    index == currentPageIndex
-                                        ? const Color.fromARGB(
-                                          255,
-                                          33,
-                                          149,
-                                          243,
-                                        )
-                                        : null,
-                                onTap:
-                                    () => _carouselSliderGroupController
-                                        .animateToPage(
-                                          index,
-                                          duration: Duration(milliseconds: 250),
-                                          curve: Curves.easeOut,
-                                        ),
+                        child: DragTarget<int>(
+                          onWillAcceptWithDetails: (details) => details.data != index,
+                          onAcceptWithDetails: (details) async {
+                            final oldIndex = details.data;
+                            final newIndex = index;
+                            await reorderGroups(ref, oldIndex, newIndex);
+                          },
+                          builder: (context, candidateData, rejectedData) {
+                            final isDraggingOver = candidateData.isNotEmpty;
+                            final currentSize = index == currentPageIndex ? 80.0 : 65.0;
+                            return LongPressDraggable<int>(
+                              data: index,
+                              maxSimultaneousDrags: 1,
+                              feedback: Material(
+                                color: Colors.transparent,
+                                child: Opacity(
+                                  opacity: 0.7,
+                                  child: GroupContainer(
+                                    index: index,
+                                    currentIndex: currentPageIndex,
+                                    size: currentSize,
+                                    onTap: () {},
+                                  ),
+                                ),
                               ),
-                            ],
-                          ),
+                              childWhenDragging: Opacity(
+                                opacity: 0.3,
+                                child: Tooltip(
+                                  textAlign: TextAlign.center,
+                                  message:
+                                      "${ref.read(modGroupDataProvider)[index].groupName}\n${p.basename(ref.read(modGroupDataProvider)[index].groupDir.path)}",
+                                  waitDuration: const Duration(milliseconds: 500),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      GroupContainer(
+                                        index: index,
+                                        currentIndex: currentPageIndex,
+                                        size: currentSize,
+                                        onTap: () {},
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              child: Tooltip(
+                                textAlign: TextAlign.center,
+                                message:
+                                    "${ref.read(modGroupDataProvider)[index].groupName}\n${p.basename(ref.read(modGroupDataProvider)[index].groupDir.path)}",
+                                waitDuration: const Duration(milliseconds: 500),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    GroupContainer(
+                                      index: index,
+                                      currentIndex: currentPageIndex,
+                                      size: currentSize,
+                                      selectedColor: isDraggingOver
+                                          ? const Color.fromARGB(255, 33, 149, 243)
+                                          : index == currentPageIndex
+                                              ? const Color.fromARGB(
+                                                255,
+                                                33,
+                                                149,
+                                                243,
+                                              )
+                                              : null,
+                                      onTap:
+                                          () => _carouselSliderGroupController
+                                              .animateToPage(
+                                                index,
+                                                duration: const Duration(milliseconds: 250),
+                                                curve: Curves.easeOut,
+                                              ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       );
                     },

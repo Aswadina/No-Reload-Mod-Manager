@@ -354,6 +354,7 @@ class _BackgroundState extends ConsumerState<Background> {
               children: [
                 if (ref.watch(tabIndexProvider) == 1 &&
                     !ref.watch(alertDialogShownProvider) &&
+                    !ref.watch(groupDragActiveProvider) &&
                     ref.watch(validModsPath) != null &&
                     ref.watch(modGroupDataProvider).isNotEmpty)
                   ModsDropZone(

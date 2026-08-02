@@ -132,3 +132,5 @@ final keybindSimulateKeypressProvider = StateProvider<bool>((ref) {
 final randomTipsProvider = StateProvider<String>((ref) {
   return "Press Space to search mods".tr();
 });
+
+final groupDragActiveProvider = StateProvider<bool>((ref) => false);

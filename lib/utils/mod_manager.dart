@@ -17,6 +17,7 @@ import 'package:no_reload_mod_manager/utils/managedfolder_watcher.dart';
 import 'package:no_reload_mod_manager/utils/shared_pref.dart';
 import 'package:no_reload_mod_manager/utils/stack_collection.dart';
 import 'package:no_reload_mod_manager/utils/state_providers.dart';
+import 'package:no_reload_mod_manager/utils/refreshable_image.dart';
 import 'package:pasteboard/pasteboard.dart';
 import 'package:path/path.dart' as p;
 
@@ -97,24 +98,43 @@ Future<List<(Directory, int)>> getGroupFolders(
 Future<int?> addGroup(WidgetRef ref, String managedPath) async {
   String? watchedPath = DynamicDirectoryWatcher.watcher?.path;
   DynamicDirectoryWatcher.stop();
-  for (int i = 1; i <= 500; i++) {
+
+  // Find the first group_X folder index that does not exist to create it
+  int nextGroupNum = 1;
+  for (int i = 1; i <= 501; i++) {
     String folderName = 'group_$i';
     Directory folder = Directory('$managedPath/$folderName');
-
     if (!await folder.exists()) {
-      await folder.create();
-      await getGroupName(folder);
-      _addGroupToRiverpod(ref, folder, i - 1);
-      if (watchedPath != null) {
-        DynamicDirectoryWatcher.watch(watchedPath);
-      }
-      return i;
+      nextGroupNum = i;
+      break;
     }
   }
+
+  String folderName = 'group_$nextGroupNum';
+  Directory folder = Directory('$managedPath/$folderName');
+
+  await folder.create();
+  await getGroupName(folder);
+
+  // Determine insertion index based on current group index
+  final currentList = ref.read(modGroupDataProvider);
+  final currentSelectionIndex = ref.read(currentGroupIndexProvider);
+  
+  // Insert next to current selection, or at the end if list is empty
+  int insertIndex = currentList.isEmpty 
+      ? 0 
+      : (currentSelectionIndex >= 0 && currentSelectionIndex < currentList.length)
+          ? currentSelectionIndex + 1
+          : currentList.length;
+
+  _addGroupToRiverpod(ref, folder, insertIndex);
+
   if (watchedPath != null) {
     DynamicDirectoryWatcher.watch(watchedPath);
   }
-  return null;
+
+  // We want to return the position of the newly inserted group in the list (1-based index)
+  return insertIndex + 1;
 }
 
 void _addGroupToRiverpod(WidgetRef ref, Directory groupDir, int index) {
@@ -148,6 +168,126 @@ void _addGroupToRiverpod(WidgetRef ref, Directory groupDir, int index) {
 
   // Write it back
   ref.read(modGroupDataProvider.notifier).state = updatedList;
+}
+
+Future<void> reorderGroups(WidgetRef ref, int oldIndex, int newIndex) async {
+  final currentList = ref.read(modGroupDataProvider);
+  if (oldIndex < 0 || oldIndex >= currentList.length || newIndex < 0 || newIndex >= currentList.length) {
+    return;
+  }
+
+  // 1. Update sort method to Index if it is Alphabetical
+  if (ref.read(sortGroupMethod) == 1) {
+    ref.read(sortGroupMethod.notifier).state = 0;
+    await SharedPrefUtils().setGroupSort(0);
+  }
+
+  // 2. Pause directory watcher to prevent race conditions during renaming
+  String? watchedPath = DynamicDirectoryWatcher.watcher?.path;
+  DynamicDirectoryWatcher.stop();
+
+  try {
+    // 3. Create the new reordered list in memory
+    final newList = List<ModGroupData>.from(currentList);
+    final movedItem = newList.removeAt(oldIndex);
+    newList.insert(newIndex, movedItem);
+
+    // 4. Rename old folders to temp names to avoid collisions during the rename loop
+    final managedPath = p.dirname(currentList[0].groupDir.path);
+    final tempDirs = <String, String>{}; // original path -> temp path
+
+    for (int i = 0; i < currentList.length; i++) {
+      final originalPath = currentList[i].groupDir.path;
+      final tempPath = p.join(managedPath, 'temp_reorder_${i}_${DateTime.now().microsecondsSinceEpoch}');
+      final dir = Directory(originalPath);
+      if (await dir.exists()) {
+        await dir.rename(tempPath);
+        tempDirs[originalPath] = tempPath;
+      }
+    }
+
+    // 5. Rename temp folders to their final group names and regenerate group_x.ini
+    final updatedList = <ModGroupData>[];
+    final errorShouldTryAgain = Ref<bool>(false);
+    final operationLogs = <TextSpan>[];
+
+    for (int i = 0; i < newList.length; i++) {
+      final group = newList[i];
+      final originalPath = group.groupDir.path;
+      final tempPath = tempDirs[originalPath];
+
+      if (tempPath != null) {
+        final newGroupName = 'group_${i + 1}';
+        final newGroupPath = p.join(managedPath, newGroupName);
+        final dir = Directory(tempPath);
+        if (await dir.exists()) {
+          await dir.rename(newGroupPath);
+
+          // Clean up any old group ini files (e.g. group_1.ini, group_2.ini etc)
+          await _deleteGroupIniFiles(newGroupPath, operationLogs, errorShouldTryAgain);
+
+          // Create the new group_x.ini for this position
+          await _createGroupIni(newGroupPath, i + 1, operationLogs, errorShouldTryAgain);
+
+          // Also, update selected index on disk if this was the selected mod index
+          final newGroupDir = Directory(newGroupPath);
+          final updatedMods = group.modsInGroup.map((mod) {
+            if (mod.modDir.path == "None") {
+              return mod;
+            }
+            final newModDir = Directory(p.join(newGroupPath, p.basename(mod.modDir.path)));
+            return ModData(
+              modDir: newModDir,
+              modIcon: getModOrGroupIcon(newModDir),
+              modName: mod.modName,
+              realIndex: mod.realIndex,
+              isOldAutoFixed: mod.isOldAutoFixed,
+              isSyntaxErrorRemoved: mod.isSyntaxErrorRemoved,
+              isUnoptimized: mod.isUnoptimized,
+              isNamespaced: mod.isNamespaced,
+            );
+          }).toList();
+
+          updatedList.add(ModGroupData(
+            groupDir: newGroupDir,
+            groupIcon: getModOrGroupIcon(newGroupDir),
+            groupName: group.groupName,
+            modsInGroup: updatedMods,
+            realIndex: i + 1,
+            previousSelectedModOnGroup: group.previousSelectedModOnGroup,
+          ));
+        }
+      }
+    }
+
+    // 6. Update currentGroupIndexProvider to the new index of the active group
+    // Find where the old active group went
+    final activeGroup = currentList[ref.read(currentGroupIndexProvider)];
+    int newActiveIndex = 0;
+    for (int i = 0; i < updatedList.length; i++) {
+      if (updatedList[i].groupName == activeGroup.groupName) {
+        newActiveIndex = i;
+        break;
+      }
+    }
+    ref.read(currentGroupIndexProvider.notifier).state = newActiveIndex;
+    await setSelectedGroupIndex(newActiveIndex, managedPath);
+
+    // Evict old/new image caches so icons refresh properly on rearrangement
+    ImageRefreshListener.refreshImages(currentList);
+    ImageRefreshListener.refreshImages(updatedList);
+
+    // 7. Write the new list back to modGroupDataProvider
+    ref.read(modGroupDataProvider.notifier).state = updatedList;
+
+  } catch (e) {
+    // If anything fails, print/ignore or log
+  } finally {
+    // 8. Resume directory watcher
+    if (watchedPath != null) {
+      DynamicDirectoryWatcher.watch(watchedPath);
+    }
+  }
 }
 
 Future<String> getGroupName(Directory groupDir) async {

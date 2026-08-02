@@ -245,10 +245,12 @@ class _GroupAreaState extends ConsumerState<GroupAreaCarousel>
   bool groupTextFieldEnabled = false;
   final FocusNode groupTextFieldFocusNode = FocusNode();
   int currentPageIndex = 0;
+  int? _lastCarouselPageIndex;
 
   @override
   void initState() {
     super.initState();
+    _lastCarouselPageIndex = widget.initialGroupIndex;
     getCurrentGroupName(widget.initialGroupIndex, calledFromInitState: true);
     ModNavigationListener.addListener(this);
     ModSearcherListener.addListener(this);
@@ -310,6 +312,24 @@ class _GroupAreaState extends ConsumerState<GroupAreaCarousel>
   @override
   Widget build(BuildContext context) {
     final sss = ref.watch(zoomScaleProvider);
+
+    ref.listen(currentGroupIndexProvider, (previous, next) {
+      if (next >= 0 && next < ref.read(modGroupDataProvider).length && next != _lastCarouselPageIndex) {
+        _carouselSliderGroupController.jumpToPage(next);
+        _lastCarouselPageIndex = next;
+        getCurrentGroupName(next);
+      }
+    });
+
+    ref.listen(modGroupDataProvider, (previous, next) {
+      final index = ref.read(currentGroupIndexProvider);
+      if (index >= 0 && index < next.length && index != _lastCarouselPageIndex) {
+        _carouselSliderGroupController.jumpToPage(index);
+        _lastCarouselPageIndex = index;
+        getCurrentGroupName(index);
+      }
+    });
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -405,7 +425,9 @@ class _GroupAreaState extends ConsumerState<GroupAreaCarousel>
             child: CarouselSlider.builder(
               itemCount: ref.watch(modGroupDataProvider).length,
               itemBuilder: (context, index, realIndex) {
+                final groupData = ref.watch(modGroupDataProvider)[index];
                 return RightClickMenuRegion(
+                  key: ValueKey('group_region_${groupData.groupName}'),
                   menuItems: [
                     CustomMenuItem(
                       scale: sss,
@@ -725,22 +747,67 @@ class _GroupAreaState extends ConsumerState<GroupAreaCarousel>
                         label: 'Remove group'.tr(),
                       ),
                   ],
-                  child: Tooltip(
-                    textAlign: TextAlign.center,
-                    message:
-                        "${ref.read(modGroupDataProvider)[index].groupName}\n${p.basename(ref.read(modGroupDataProvider)[index].groupDir.path)}",
-                    waitDuration: Duration(milliseconds: 500),
-                    child: GroupContainer(
-                      index: index,
-                      currentIndex: currentPageIndex,
-                      size: 93.6,
-                      onTap:
-                          () => _carouselSliderGroupController.animateToPage(
-                            index,
-                            duration: Duration(milliseconds: 250),
-                            curve: Curves.easeOut,
+                  child: DragTarget<int>(
+                    onWillAcceptWithDetails: (details) => details.data != index,
+                    onAcceptWithDetails: (details) async {
+                      final oldIndex = details.data;
+                      final newIndex = index;
+                      await reorderGroups(ref, oldIndex, newIndex);
+                    },
+                    builder: (context, candidateData, rejectedData) {
+                      final isDraggingOver = candidateData.isNotEmpty;
+                      return LongPressDraggable<int>(
+                        data: index,
+                        maxSimultaneousDrags: 1,
+                        feedback: Material(
+                          color: Colors.transparent,
+                          child: Opacity(
+                            opacity: 0.7,
+                            child: GroupContainer(
+                              index: index,
+                              currentIndex: currentPageIndex,
+                              size: 93.6,
+                              onTap: () {},
+                            ),
                           ),
-                    ),
+                        ),
+                        childWhenDragging: Opacity(
+                          opacity: 0.3,
+                          child: Tooltip(
+                            textAlign: TextAlign.center,
+                            message:
+                                "${ref.read(modGroupDataProvider)[index].groupName}\n${p.basename(ref.read(modGroupDataProvider)[index].groupDir.path)}",
+                            waitDuration: const Duration(milliseconds: 500),
+                            child: GroupContainer(
+                              index: index,
+                              currentIndex: currentPageIndex,
+                              size: 93.6,
+                              onTap: () {},
+                            ),
+                          ),
+                        ),
+                        child: Tooltip(
+                          textAlign: TextAlign.center,
+                          message:
+                              "${ref.read(modGroupDataProvider)[index].groupName}\n${p.basename(ref.read(modGroupDataProvider)[index].groupDir.path)}",
+                          waitDuration: const Duration(milliseconds: 500),
+                          child: GroupContainer(
+                            index: index,
+                            currentIndex: currentPageIndex,
+                            size: 93.6,
+                            selectedColor: isDraggingOver
+                                ? const Color.fromARGB(255, 33, 149, 243)
+                                : null,
+                            onTap:
+                                () => _carouselSliderGroupController.animateToPage(
+                                  index,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeOut,
+                                ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
               },
@@ -752,6 +819,7 @@ class _GroupAreaState extends ConsumerState<GroupAreaCarousel>
                 enlargeCenterPage: true,
                 enlargeFactor: .05,
                 onPageChanged: (index, reason, realIndex) {
+                  _lastCarouselPageIndex = index;
                   getCurrentGroupName(index);
                 },
                 scrollPhysics:
@@ -921,9 +989,6 @@ class _ModAreaState extends ConsumerState<ModAreaCarousel>
     windowManager.addListener(this);
     super.initState();
     goToSelectedModIndex();
-    ref.listenManual(currentGroupIndexProvider, (p, n) {
-      goToSelectedModIndex();
-    });
     onWindowResize();
     ModNavigationListener.addListener(this);
     ModSearcherListener.addListener(this);
@@ -950,6 +1015,14 @@ class _ModAreaState extends ConsumerState<ModAreaCarousel>
   @override
   Widget build(BuildContext context) {
     final sss = ref.watch(zoomScaleProvider);
+
+    ref.listen(currentGroupIndexProvider, (previous, next) {
+      goToSelectedModIndex();
+    });
+    ref.listen(modGroupDataProvider, (previous, next) {
+      goToSelectedModIndex();
+    });
+
     return Expanded(
       child: SizedBox(
         height: 215 * sss * 1.2,
