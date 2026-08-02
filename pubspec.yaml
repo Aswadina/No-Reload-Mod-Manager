@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.9.0+2
+version: 3.1.3+1
 
 environment:
   sdk: ^3.7.2
@@ -70,6 +70,8 @@ dependencies:
   top_snackbar_flutter: ^3.3.0
   flutter_local_notifications: ^19.4.2
   charset_converter: ^2.3.0
+  collection: ^1.19.1
+  pool: ^1.5.2
   
 dev_dependencies:
   flutter_test:
@@ -96,10 +98,15 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - assets/images/verina_plant.webp
+    - assets/images/verina_sad.webp
+    - assets/images/encore_wow.webp
+    - assets/images/camellya_peek.webp
     - assets/images/app_icon.ico
     - assets/images/app_icon.png
     - assets/template_txt/listen_keypress_even_on_background.txt
     - assets/template_txt/listen_keypress_manager.txt
+    - assets/template_txt/listen_keypress_additional_window.txt
     - assets/template_txt/template_group.txt
     - assets/template_txt/template_manager_group.txt
     - assets/keys_icon/
@@ -131,3 +138,7 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  fonts:
+      - family: CustomIcons
+        fonts:
+          - asset: fonts/CustomIcons.ttf

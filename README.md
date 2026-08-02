@@ -1,10 +1,4 @@
-### Repository Contribution
-Feel free to contribute on this project, especially adding more [languages translation](https://github.com/Aglglg/No-Reload-Mod-Manager/tree/main/assets/translations). Or providing [auto character icon data](https://github.com/Aglglg/No-Reload-Mod-Manager/tree/main/assets/cloud_data/auto_icon). Or anything else.
-How? Of course, first of all you must know [How to contribute to open sourced project on Github](https://youtu.be/CML6vfKjQss).
-
----
 ### To-do list
-- Troubleshoot & Preset features
 - Bugfixes 
 ---
 
@@ -106,7 +100,6 @@ Even though this is not main mod loader or mod tool, and only tool to organize m
 - Toggle window shortcuts (Alt+W) works by reading **target game process names** (e.g., `Client-Win64-Shipping.exe`).
 - In order to change selected mods, this tool will do VK_KEYS keypress simulation & mouse movement.
 - The mods that you added also being modified, you can remove the lines that were added by the mod manager, by dragging it to Restorer area on Settings.
-- **XXMI DLL/3dmigoto will receives keypresses in the background**, d3dx.ini modified.
 
 ## Mod Ini Files Modification
 - In order to switch selected mod in realtime without reload, ini files modification is needed.
@@ -160,8 +153,3 @@ Even though this is not main mod loader or mod tool, and only tool to organize m
 Special thanks to:
 - **All bug reporters, contributors, testers, users, and especially _supporters_!** ❤️
 ---
-
-## Additions
-If you don't like of the mod toggles/customizations are changed even though the game is in background (nrmm_keypress.txt is mandatory)  
-Or you want to play multiple supported games at the same time without interferring mod selections  
-You can use [Custom XXMI-Lib-Package](https://github.com/Aglglg/XXMI-Libs-Package) (based on Original XXMI-Lib-Package)  

@@ -284,9 +284,9 @@ bool CommandListOperand::optimise(std::shared_ptr<CommandListEvaluatable>* repla
 static const wchar_t* operator_tokens[] = {
 	L"===", L"!==",
 
-	L"==", L"!=", L"//", L"<=", L">=", L"&&", L"||", L"**",
+	L"<<", L">>", L"==", L"!=", L"//", L"<=", L">=", L"&&", L"||", L"**",
 
-	L"(", L")", L"!", L"*", L"/", L"%", L"+", L"-", L"<", L">",
+	L"(", L")", L"!", L"~", L"&", L"|", L"^", L"*", L"/", L"%", L"+", L"-", L"<", L">",
 };
 
 class CommandListSyntaxError : public std::exception
@@ -337,10 +337,17 @@ static void tokenise(Globals& G, const std::wstring* expression, CommandListSynt
 			}
 		}
 
-		pos = remain.find_first_not_of(L"abcdefghijklmnopqrstuvwxyz_-0123456789");
+		pos = remain.find_first_not_of(L"@#abcdefghijklmnopqrstuvwxyz_-0123456789[$.]>()");
 		if (pos) {
 			token = remain.substr(0, pos);
-			ret = texture_filter_target.ParseTarget(G, token.c_str(), true, ini_namespace);
+			// If token contains '(', look for ')' to include whitespaces
+			if (token.find(L'(') != std::wstring::npos)
+			{
+				size_t end = remain.find(L')', 0);
+				token = remain.substr(0, end + 1);
+				pos = end + 1;
+			}
+			ret = texture_filter_target.ParseTarget(G, token.c_str(), true, ini_namespace, scope);
 			if (ret) {
 				operand = std::make_shared<CommandListOperand>(friendly_pos, token);
 				if (operand->parse(G, &token, ini_namespace, scope)) {
@@ -361,7 +368,7 @@ static void tokenise(Globals& G, const std::wstring* expression, CommandListSynt
 		if (remain[0] < '0' || remain[0] > '9') {
 			pos = remain.find_first_not_of(L"abcdefghijklmnopqrstuvwxyz_0123456789$.");
 			if (pos != remain.npos && remain[pos] == L'\\') {
-				end_pos = remain.find_first_of(L"=&|+-/*><%!", pos + 1);
+				end_pos = remain.find_first_of(L"=&|+-/*><%!^~", pos + 1);
 				start_pos = remain.rfind(L'\\', end_pos) + 1;
 				pos = remain.find_first_not_of(L"abcdefghijklmnopqrstuvwxyz_0123456789.", start_pos);
 			}
@@ -452,6 +459,7 @@ public: \
 static CommandListOperatorFactory<name##T> name;
 
 DEFINE_OPERATOR(unary_not_operator, "!", (!rhs));
+DEFINE_OPERATOR(bitwise_not_operator, "~", (~(int32_t)rhs));
 DEFINE_OPERATOR(unary_plus_operator, "+", (+rhs));
 DEFINE_OPERATOR(unary_negate_operator, "-", (-rhs));
 
@@ -465,6 +473,9 @@ DEFINE_OPERATOR(modulus_operator, "%", (fmod(lhs, rhs)));
 DEFINE_OPERATOR(addition_operator, "+", (lhs + rhs));
 DEFINE_OPERATOR(subtraction_operator, "-", (lhs - rhs));
 
+DEFINE_OPERATOR(left_shift_operator, "<<", ((int32_t)lhs << (int32_t)rhs));
+DEFINE_OPERATOR(right_shift_operator, ">>", ((int32_t)lhs >> (int32_t)rhs));
+
 DEFINE_OPERATOR(less_operator, "<", (lhs < rhs));
 DEFINE_OPERATOR(less_equal_operator, "<=", (lhs <= rhs));
 DEFINE_OPERATOR(greater_operator, ">", (lhs > rhs));
@@ -475,12 +486,17 @@ DEFINE_OPERATOR(inequality_operator, "!=", (lhs != rhs));
 DEFINE_OPERATOR(identical_operator, "===", (*(uint32_t*)&lhs == *(uint32_t*)&rhs));
 DEFINE_OPERATOR(not_identical_operator, "!==", (*(uint32_t*)&lhs != *(uint32_t*)&rhs));
 
+DEFINE_OPERATOR(bitwise_and_operator, "&", ((int32_t)lhs& (int32_t)rhs));
+DEFINE_OPERATOR(bitwise_xor_operator, "^", ((int32_t)lhs ^ (int32_t)rhs));
+DEFINE_OPERATOR(bitwise_or_operator, "|", ((int32_t)lhs | (int32_t)rhs));
+
 DEFINE_OPERATOR(and_operator, "&&", (lhs&& rhs));
 
 DEFINE_OPERATOR(or_operator, "||", (lhs || rhs));
 
 static CommandListOperatorFactoryBase* unary_operators[] = {
 	&unary_not_operator,
+	&bitwise_not_operator,
 	&unary_negate_operator,
 	&unary_plus_operator,
 };
@@ -497,6 +513,10 @@ static CommandListOperatorFactoryBase* add_subtract_operators[] = {
 	&addition_operator,
 	&subtraction_operator,
 };
+static CommandListOperatorFactoryBase* shift_operators[] = {
+	&left_shift_operator,
+	&right_shift_operator,
+};
 static CommandListOperatorFactoryBase* relational_operators[] = {
 	&less_operator,
 	&less_equal_operator,
@@ -508,6 +528,15 @@ static CommandListOperatorFactoryBase* equality_operators[] = {
 	&inequality_operator,
 	&identical_operator,
 	&not_identical_operator,
+};
+static CommandListOperatorFactoryBase* bitwise_and_operators[] = {
+	&bitwise_and_operator,
+};
+static CommandListOperatorFactoryBase* bitwise_xor_operators[] = {
+	&bitwise_xor_operator,
+};
+static CommandListOperatorFactoryBase* bitwise_or_operators[] = {
+	&bitwise_or_operator,
 };
 static CommandListOperatorFactoryBase* and_operators[] = {
 	&and_operator,
@@ -625,8 +654,12 @@ bool CommandListExpression::parse(Globals& G, const std::wstring* expression, co
 		transform_operators_recursive(&tree, exponent_operators, ARRAYSIZE(exponent_operators), true, false);
 		transform_operators_recursive(&tree, multi_division_operators, ARRAYSIZE(multi_division_operators), false, false);
 		transform_operators_recursive(&tree, add_subtract_operators, ARRAYSIZE(add_subtract_operators), false, false);
+		transform_operators_recursive(&tree, shift_operators, ARRAYSIZE(shift_operators), false, false);
 		transform_operators_recursive(&tree, relational_operators, ARRAYSIZE(relational_operators), false, false);
 		transform_operators_recursive(&tree, equality_operators, ARRAYSIZE(equality_operators), false, false);
+		transform_operators_recursive(&tree, bitwise_and_operators, ARRAYSIZE(bitwise_and_operators), false, false);
+		transform_operators_recursive(&tree, bitwise_xor_operators, ARRAYSIZE(bitwise_xor_operators), false, false);
+		transform_operators_recursive(&tree, bitwise_or_operators, ARRAYSIZE(bitwise_or_operators), false, false);
 		transform_operators_recursive(&tree, and_operators, ARRAYSIZE(and_operators), false, false);
 		transform_operators_recursive(&tree, or_operators, ARRAYSIZE(or_operators), false, false);
 
@@ -931,7 +964,7 @@ bool CommandListOperand::parse(Globals& G, const std::wstring* operand, const st
 		return operand_allowed_in_context(type, scope);
 	}
 
-	ret = texture_filter_target.ParseTarget(G, operand->c_str(), true, ini_namespace);
+	ret = texture_filter_target.ParseTarget(G, operand->c_str(), true, ini_namespace, scope);
 	if (ret) {
 		type = ParamOverrideType::TEXTURE;
 		return operand_allowed_in_context(type, scope);
@@ -1020,137 +1053,499 @@ CustomResource::~CustomResource()
 {
 }
 
-bool ResourceCopyTarget::ParseTarget(Globals& G, const wchar_t* target,
-	bool is_source, const std::wstring* ini_namespace)
+CustomResourcePool::CustomResourcePool()
 {
-	int ret, len;
-	size_t length = wcslen(target);
-	CustomResources::iterator res;
+}
 
-	ret = swscanf_s(target, L"%lcs-cb%u%n", &shader_type, 1, &slot, &len);
-	//D3D11_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT = 14
-	if (ret == 2 && len == length && slot < 14) {
-		type = ResourceCopyTargetType::CONSTANT_BUFFER;
-		goto check_shader_type;
+CustomResourcePool::~CustomResourcePool()
+{
+}
+
+IniParserResult ResourceCopyTarget::ParseTargetPrefix(const wchar_t*& target, size_t& length)
+{
+	switch (target[0]) {
+	case L'$':
+		return IniParserResult::SYNTAX_ERROR;
+	case L'@':
+		evaluation_mode = ResourceCopyTargetEvaluationMode::RESOURCE_IDENTITY;
+		target++;
+		length--;
+		return IniParserResult::TOKEN_FOUND;
+	case L'#':
+		evaluation_mode = ResourceCopyTargetEvaluationMode::POOL_INDEX;
+		target++;
+		length--;
+		return IniParserResult::TOKEN_FOUND;
 	}
+	return IniParserResult::TOKEN_NOT_FOUND;
+}
 
-	ret = swscanf_s(target, L"%lcs-t%u%n", &shader_type, 1, &slot, &len);
-	//D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT = 128
-	if (ret == 2 && len == length && slot < 128) {
-		type = ResourceCopyTargetType::SHADER_RESOURCE;
-		goto check_shader_type;
-	}
+bool ResourceCopyTarget::ParseMemberArgument(Globals& G, const std::wstring& text, const std::wstring* ini_namespace, CommandListScope* scope, MemberArg& arg)
+{
+	if (text.empty())
+		return false;
 
-	ret = swscanf_s(target, L"o%u%n", &slot, &len);
-	//D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT = 8
-	if (ret == 1 && len == length && slot < 8) {
-		type = ResourceCopyTargetType::RENDER_TARGET;
-		return true;
-	}
+	if (text[0] == L'$')
+	{
+		// Parse DYNAMIC attr ($id)
+		CommandListVariable* var = nullptr;
 
-	if (!wcscmp(target, L"od")) {
-		type = ResourceCopyTargetType::DEPTH_STENCIL_TARGET;
-		return true;
-	}
-
-	ret = swscanf_s(target, L"%lcs-u%u%n", &shader_type, 1, &slot, &len);
-	//D3D11_PS_CS_UAV_REGISTER_COUNT = 8
-	if (ret == 2 && len == length && slot < 8) {
-
-		if (shader_type == L'p' || shader_type == L'c') {
-			type = ResourceCopyTargetType::UNORDERED_ACCESS_VIEW;
+		// Try parsing var_name as a variable:
+		if (find_local_variable(text, scope, &var) || parse_command_list_var_name(G, text, ini_namespace, &var)) {
+			arg.var = var;
 			return true;
 		}
+
 		return false;
 	}
+	else
+	{
+		// Parse STATIC attr (0)
+		wchar_t* end = nullptr;
+		float value = wcstof(text.c_str(), &end);
 
-	ret = swscanf_s(target, L"vb%u%n", &slot, &len);
-	//D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT	= 32
-	if (ret == 1 && len == length && slot < 32) {
-		type = ResourceCopyTargetType::VERTEX_BUFFER;
-		return true;
-	}
-
-	if (!wcscmp(target, L"ib")) {
-		type = ResourceCopyTargetType::INDEX_BUFFER;
-		return true;
-	}
-
-	ret = swscanf_s(target, L"so%u%n", &slot, &len);
-	//D3D11_SO_STREAM_COUNT	= 4
-	if (ret == 1 && len == length && slot < 4) {
-		type = ResourceCopyTargetType::STREAM_OUTPUT;
-		return true;
-	}
-
-	if (is_source && !wcscmp(target, L"null")) {
-		type = ResourceCopyTargetType::EMPTY;
-		return true;
-	}
-
-	if (length >= 9 && !wcsncmp(target, L"resource", 8)) {
-
-		std::wstring resource_id(target);
-		std::wstring namespaced_section;
-
-		res = G.customResources.end();
-		if (get_namespaced_section_name_lower(&resource_id, ini_namespace, &namespaced_section))
-			res = G.customResources.find(namespaced_section);
-		if (res == G.customResources.end())
-			res = G.customResources.find(resource_id);
-		if (res == G.customResources.end())
+		// Try parsing var_name as a float
+		if (*end != L'\0')
 			return false;
 
-		custom_resource = &res->second;
+		arg.constant = value;
+	}
+
+	return true;
+}
+
+IniParserResult ResourceCopyTarget::GetNextArgument(const wchar_t*& arg_start, const wchar_t* args_end, std::wstring& text)
+{
+	if (arg_start >= args_end)
+		return IniParserResult::TOKEN_NOT_FOUND;
+
+	const wchar_t* arg_end = wcschr(arg_start, L',');
+
+	// Ensure staying within `(arg_start ... args_end)` bounds
+	if (!arg_end || arg_end > args_end)
+		arg_end = args_end;
+
+	// Trim left
+	while (arg_start < arg_end && iswspace(*arg_start))
+		++arg_start;
+
+	const wchar_t* real_end = arg_end;
+
+	// Trim right
+	while (real_end > arg_start && iswspace(real_end[-1]))
+		--real_end;
+
+	text.assign(arg_start, real_end);
+
+	arg_start = (arg_end < args_end) ? arg_end + 1 : args_end;
+
+	return text.empty() ? IniParserResult::SYNTAX_ERROR : IniParserResult::TOKEN_FOUND;
+}
+
+IniParserResult ResourceCopyTarget::ParseTargetMemberArguments(
+	Globals& G, const wchar_t*& target, size_t& length, const std::wstring* ini_namespace, CommandListScope* scope, size_t& num_args
+)
+{
+	if (length == 0 || target[length - 1] != L')' || !(evaluation_mode & ResourceCopyTargetEvaluationMode::RESOURCE_MASK)) {
+		return IniParserResult::TOKEN_NOT_FOUND;
+	}
+
+	const wchar_t* args_open_pos = wcsrchr(target, L'(');
+
+	if (!args_open_pos || args_open_pos <= target)
+		return IniParserResult::SYNTAX_ERROR; // Invalid syntax (opening `(` not found or located after closing `)`)
+
+	const wchar_t* args_end = target + length - 1;
+
+	// Remove "(...)" from target
+	length = args_open_pos - target;
+
+	const wchar_t* arg_start = args_open_pos + 1;
+
+	while (true)
+	{
+		std::wstring text;
+
+		IniParserResult ret = GetNextArgument(arg_start, args_end, text);
+
+		if (ret == IniParserResult::SYNTAX_ERROR)
+			return IniParserResult::SYNTAX_ERROR;
+
+		if (ret == IniParserResult::TOKEN_NOT_FOUND)
+			break;
+
+		if (!ParseMemberArgument(G, text, ini_namespace, scope, member_args[num_args]))
+			return IniParserResult::SYNTAX_ERROR;
+
+		++num_args;
+	}
+
+	return IniParserResult::TOKEN_FOUND;
+}
+
+bool suffix_equals(const wchar_t* str, size_t len, const wchar_t* suffix, size_t suffix_len)
+{
+	return len >= suffix_len && !wmemcmp(str + len - suffix_len, suffix, suffix_len);
+}
+
+IniParserResult ResourceCopyTarget::ParseTargetMember(
+	Globals& G, const wchar_t*& target, size_t& length, std::wstring& temp_target, const std::wstring* ini_namespace, CommandListScope* scope
+)
+{
+	//LogInfo("ParseTargetMember: target=%ls, length=%d\n", target, length);
+
+	if (length < 8 // Smallest possible match is "ib->size", so this check rejects almost everything except custom resources.
+		|| !(evaluation_mode & ResourceCopyTargetEvaluationMode::RESOURCE_MASK)) // Members are supported only for Resources.
+	{
+		return IniParserResult::TOKEN_NOT_FOUND;
+	}
+
+	struct MemberInfo {
+		const wchar_t* keyword;
+		size_t len; // including "->"
+		ResourceCopyTargetEvaluationMode mode;
+		size_t num_args = 0;
+	};
+
+	static constexpr MemberInfo members[] = {
+		{ L"->size",          6, ResourceCopyTargetEvaluationMode::RESOURCE_SIZE,          0 },
+		{ L"->offset",        8, ResourceCopyTargetEvaluationMode::RESOURCE_OFFSET,        0 },
+		{ L"->stride",        8, ResourceCopyTargetEvaluationMode::RESOURCE_STRIDE,        0 },
+		{ L"->hashregion",   12, ResourceCopyTargetEvaluationMode::RESOURCE_REGION_HASH,   2 },
+		{ L"->sourcestride", 14, ResourceCopyTargetEvaluationMode::RESOURCE_SOURCE_STRIDE, 0 },
+	};
+
+	// Consume arguments (adjust `length` accordingly). Ensure syntax error passthrough.
+	size_t num_args = 0;
+	if (ParseTargetMemberArguments(G, target, length, ini_namespace, scope, num_args) == IniParserResult::SYNTAX_ERROR)
+		return IniParserResult::SYNTAX_ERROR;
+
+	// Consume member keyword (adjust `target` and `length` accordingly).
+	for (const auto& member : members) {
+		// Members are listed by ASC length. Exit loop if target is shorter than current member length plus "ib" length of 2.
+		if (length < member.len + 2)
+			break;
+		// Skip to next member if ">" pointer is not found at expected pos (avoids unneeded "wmemcmp" calls).
+		const wchar_t* member_pos = target + length - member.len;
+		if (member_pos[1] != L'>')
+			continue;
+		// Check if the trailing end matches the member substr, "->" included.
+		if (suffix_equals(target, length, member.keyword, member.len)) {
+			// Number of parsed argments must meet expectations.
+			// While we allow both ->Size and ->Size(), we don't want user to put something weird inbetween.
+			if (num_args != member.num_args)
+				return IniParserResult::SYNTAX_ERROR;
+			// Member found.
+			evaluation_mode = member.mode;
+			length -= member.len;
+			temp_target.assign(target, length);
+			target = temp_target.c_str();
+			//LogInfo("ParseTargetMember: TOKEN_FOUND keyword=%ls, target=%ls\n", member.keyword, target);
+			return IniParserResult::TOKEN_FOUND;
+		}
+	}
+
+	return IniParserResult::TOKEN_NOT_FOUND;
+}
+
+IniParserResult ResourceCopyTarget::ParseTargetCustomResource(Globals& G, const wchar_t*& target, size_t length, const std::wstring* ini_namespace, CommandListScope* scope)
+{
+	//LogInfo("ParseTargetCustomResource: target=%ls, length=%d\n", target, length);
+	if (length < 9 || wcsncmp(target, L"resource", 8))
+		return IniParserResult::TOKEN_NOT_FOUND;
+
+	// Exit early for non-resource type evaluation modes (essentially on invalid syntax)
+	if (!(evaluation_mode & ResourceCopyTargetEvaluationMode::RESOURCE_MASK))
+		return IniParserResult::SYNTAX_ERROR;
+
+	// section name should already have been transformed to lower
+	// case from ParseCommandList, so our keys will be consistent
+	// in the unordered_map:
+	std::wstring resource_id(target);
+	std::wstring namespaced_section;
+
+	CustomResources::iterator res = G.customResources.end();
+	if (get_namespaced_section_name_lower(&resource_id, ini_namespace, &namespaced_section))
+		res = G.customResources.find(namespaced_section);
+	if (res == G.customResources.end())
+		res = G.customResources.find(resource_id);
+	if (res == G.customResources.end())
+		return IniParserResult::SYNTAX_ERROR;
+
+	_custom_resource = &res->second;
+	type = ResourceCopyTargetType::CUSTOM_RESOURCE;
+
+	return IniParserResult::TOKEN_FOUND;
+}
+
+IniParserResult ResourceCopyTarget::ParseTargetPool(Globals& G, const wchar_t*& target, size_t length, const std::wstring* ini_namespace, CommandListScope* scope)
+{
+	//LogInfo("ParseTargetPool: target=%ls, length=%d\n", target, length);
+	if (length < 5 || wcsncmp(target, L"pool", 4))
+		return IniParserResult::TOKEN_NOT_FOUND;
+
+	std::wstring pool_id;
+	std::wstring pool_index_var_name;
+
+	if (target[length - 1] == L']')
+	{
+		// Parse PoolName[$id] or PoolName[0]
+		const wchar_t* pool_index_open_pos = wcsrchr(target, L'[');
+		if (pool_index_open_pos && pool_index_open_pos > target) {
+			pool_index_var_name = std::wstring(pool_index_open_pos + 1, target + length - 1);
+			length = pool_index_open_pos - target;
+			pool_id = std::wstring(target, target + length);
+		}
+		else {
+			// Invalid syntax (opening `[` not found or located after closing `]`)
+			return IniParserResult::SYNTAX_ERROR;
+		}
+	}
+	else if (evaluation_mode == ResourceCopyTargetEvaluationMode::RESOURCE_IDENTITY)
+	{
+		// Treat ^PoolName as POOL_IDENTITY instead of RESOURCE_IDENTITY (no index provided)
+		evaluation_mode = ResourceCopyTargetEvaluationMode::POOL_IDENTITY;
+		pool_id = std::wstring(target);
+	}
+	else if (evaluation_mode == ResourceCopyTargetEvaluationMode::POOL_INDEX)
+	{
+		// Treat #PoolName as POOL_SIZE instead of POOL_INDEX (no index provided)
+		evaluation_mode = ResourceCopyTargetEvaluationMode::POOL_SIZE;
+		pool_id = std::wstring(target);
+	}
+
+	if (!pool_id.empty())
+	{
+		std::wstring namespaced_section;
+		CustomResourcePools::iterator con = G.customResourcePools.end();
+		if (get_namespaced_section_name_lower(&pool_id, ini_namespace, &namespaced_section))
+			con = G.customResourcePools.find(namespaced_section);
+		if (con == G.customResourcePools.end())
+			con = G.customResourcePools.find(pool_id);
+		if (con != G.customResourcePools.end())
+			custom_resource_pool = &con->second;
+	}
+
+	if (custom_resource_pool == nullptr)
+		return IniParserResult::SYNTAX_ERROR;
+
+	// Handle resource pool index
+	if (!pool_index_var_name.empty()) {
+		if (pool_index_var_name[0] == L'$')
+		{
+			// Parse DYNAMIC pool index PoolName[$id]
+			CommandListVariable* var = NULL;
+			// Try parsing var_name as a variable:
+			if (find_local_variable(pool_index_var_name, scope, &var) ||
+				parse_command_list_var_name(G, pool_index_var_name, ini_namespace, &var)) {
+				// Bind custom resource pool
+				// Custom resource will be resolved dynamically in ResourceCopyTarget::GetResource
+				custom_resource_pool_index_var = var;
+			}
+			else {
+				return IniParserResult::SYNTAX_ERROR;
+			}
+			//LogInfo("ParseTargetPool: TOKEN_FOUND CUSTOM_RESOURCE var=%ls\n", pool_index_var_name.c_str());
+		}
+		else
+		{
+			// Parse STATIC pool index or PoolName[0] 
+			wchar_t* end;
+			// Try parsing var_name as a float
+			float value = wcstof(pool_index_var_name.c_str(), &end);
+			if (*end != L'\0')
+				return IniParserResult::SYNTAX_ERROR;
+			// Bind custom resource instance directly
+			//_custom_resource = custom_resource_pool->GetResource(value);
+			//LogInfo("ParseTargetPool: TOKEN_FOUND CUSTOM_RESOURCE value=%f\n", value);
+		}
+
 		type = ResourceCopyTargetType::CUSTOM_RESOURCE;
-		return true;
+	}
+	else
+	{
+		type = ResourceCopyTargetType::CUSTOM_RESOURCE_POOL;
 	}
 
-	if (is_source && !wcscmp(target, L"iniparams")) {
-		type = ResourceCopyTargetType::INI_PARAMS;
-		return true;
-	}
+	return IniParserResult::TOKEN_FOUND;
+}
 
-	if (is_source && !wcscmp(target, L"cursor_mask")) {
-		type = ResourceCopyTargetType::CURSOR_MASK;
-		return true;
-	}
-
-	if (is_source && !wcscmp(target, L"cursor_color")) {
-		type = ResourceCopyTargetType::CURSOR_COLOR;
-		return true;
-	}
-
-	if (!wcscmp(target, L"this")) {
-		type = ResourceCopyTargetType::THIS_RESOURCE;
-		return true;
-	}
-
-	if (is_source && !wcscmp(target, L"bb")) {
-		type = ResourceCopyTargetType::SWAP_CHAIN;
-
-		return true;
-	}
-
-	if (is_source && !wcscmp(target, L"r_bb")) {
-		type = ResourceCopyTargetType::REAL_SWAP_CHAIN;
-
-		return true;
-	}
-
-	if (is_source && !wcscmp(target, L"f_bb")) {
-		type = ResourceCopyTargetType::FAKE_SWAP_CHAIN;
-
-		return true;
-	}
-
-	return false;
-
-check_shader_type:
+static constexpr bool is_shader_resource(wchar_t shader_type) {
 	switch (shader_type) {
 	case L'v': case L'h': case L'd': case L'g': case L'p': case L'c':
 		return true;
+	default:
+		return false;
 	}
+}
+
+//Taken from d3d11.h
+#define	D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT	( 8 )
+#define	D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT	( 32 )
+#define	D3D11_SO_STREAM_COUNT	( 4 )
+#define	D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT	( 128 )
+#define	D3D11_1_UAV_SLOT_COUNT	( 64 )
+#define	D3D11_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT	( 14 )
+
+constexpr bool token_equals(const wchar_t* str, size_t len, const wchar_t* token, size_t token_len)
+{
+	return len == token_len && wmemcmp(str, token, token_len) == 0;
+}
+
+IniParserResult ResourceCopyTarget::ParseTargetPipelineSlot(const wchar_t*& target, size_t length, bool is_source)
+{
+	//LogInfo("ParseTargetPipelineSlot: target=%ls, length=%d, is_source=%d\n", target, length, is_source);
+
+	int ret, len;
+
+	struct TargetInfo {
+		const wchar_t* keyword;
+		size_t len;
+		ResourceCopyTargetType type;
+		bool source_only;
+		bool parse_shader = false;
+		int max_slot_count = 0;
+	};
+
+	static constexpr TargetInfo targets[] = {
+		{ L"ib",            2, ResourceCopyTargetType::INDEX_BUFFER,          false                                                           },
+		// o7 (length: min = 2, max = 2)
+		{ L"o%u%n",         2, ResourceCopyTargetType::RENDER_TARGET,         false, false, D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT            },
+		// XXX: Any reason to allow access to sequential swap chains? Given
+		// they either won't exist or are read only I can't think of one.
+		{ L"bb",            2, ResourceCopyTargetType::SWAP_CHAIN,            true,                                                           },
+		{ L"od",            2, ResourceCopyTargetType::DEPTH_STENCIL_TARGET,  false,                                                          },
+		// vb31 (length: min = 3, max = 4)
+		{ L"vb%u%n",        3, ResourceCopyTargetType::VERTEX_BUFFER,         false, false, D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT         },
+		// so3 (length: min = 3, max = 3)
+		{ L"so%u%n",        3, ResourceCopyTargetType::STREAM_OUTPUT,         false, false, D3D11_SO_STREAM_COUNT                             },
+		{ L"this",          4, ResourceCopyTargetType::THIS_RESOURCE,         false,                                                          },
+		{ L"null",          4, ResourceCopyTargetType::EMPTY,                 true,                                                           },
+		{ L"r_bb",          4, ResourceCopyTargetType::REAL_SWAP_CHAIN,       true,                                                           },
+		{ L"f_bb",          4, ResourceCopyTargetType::FAKE_SWAP_CHAIN,       true,                                                           },
+		// vs-t127 (length: min = 5, max = 7)
+		{ L"%lcs-t%u%n",    5, ResourceCopyTargetType::SHADER_RESOURCE,       false,  true, D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT      },
+		// cs-u7 (length: min = 5, max = 5)
+		{ L"%lcs-u%u%n",    5, ResourceCopyTargetType::UNORDERED_ACCESS_VIEW, false,  true, D3D11_1_UAV_SLOT_COUNT                            },
+		// vs-cb13 (length: min = 6, max = 7)
+		{ L"%lcs-cb%u%n",   6, ResourceCopyTargetType::CONSTANT_BUFFER,       false,  true, D3D11_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT },
+		// Alternate means to assign IniParams
+		{ L"iniparams",     9, ResourceCopyTargetType::INI_PARAMS,            true,                                                           },
+		{ L"cursor_mask",  11, ResourceCopyTargetType::CURSOR_MASK,           true,                                                           },
+		{ L"cursor_color", 12, ResourceCopyTargetType::CURSOR_COLOR,          true,                                                           },
+
+		// TODO
+		// vs-s15 (length: min = 5, max = 6)
+		//{ L"%lcs-s%u%n",    5, ResourceCopyTargetType::SHADER_RESOURCE,      true,   true, D3D11_COMMONSHADER_SAMPLER_SLOT_COUNT           },
+	};
+
+	// Consume member keyword (adjust `target` and `length` accordingly).
+	bool found = false;
+	for (const auto& t : targets) {
+		// Targets are listed by ASC length. Exit loop if token length is shorter than minimal length of current target.
+		if (length < t.len)
+			break;
+		// Skip to next target if this one has to be a source (rhd), but destination (lhd) is being parsed (avoids unneeded "wmemcmp" calls).
+		if (t.source_only && !is_source)
+			continue;
+		// Match token against pattern with shader type and slot id.
+		if (t.parse_shader) {
+			ret = swscanf_s(target, t.keyword, &shader_type, 1, &slot, &len);
+			if (ret == 2 && len == length && slot < t.max_slot_count) {
+				type = t.type;
+				if (type == ResourceCopyTargetType::UNORDERED_ACCESS_VIEW) {
+					// These views are only valid for pixel and compute shaders:
+					if (shader_type != L'p' && shader_type != L'c') {
+						return IniParserResult::SYNTAX_ERROR;
+					}
+				}
+				//LogInfo("ParseTargetPipelineSlot: TOKEN_FOUND target=%ls, shader_type=%lc, slot=%d\n", t.keyword, shader_type, slot);
+				return is_shader_resource(shader_type) ? IniParserResult::TOKEN_FOUND : IniParserResult::SYNTAX_ERROR;
+			}
+		}
+		// Match token against pattern with slot id only.
+		else if (t.max_slot_count)
+		{
+			ret = swscanf_s(target, t.keyword, &slot, &len);
+			if (ret == 1 && len == length && slot < t.max_slot_count) {
+				type = t.type;
+				//LogInfo("ParseTargetPipelineSlot: TOKEN_FOUND target=%ls, slot=%d\n", t.keyword, slot);
+				return IniParserResult::TOKEN_FOUND;
+			}
+		}
+		// Match token against exact string.
+		else if (token_equals(target, length, t.keyword, t.len)) {
+			type = t.type;
+
+			if (type & ResourceCopyTargetType::SWAP_CHAIN_MASK) {
+				// Holding a reference on the back buffer will prevent
+				// ResizeBuffers() from working, so forbid caching any views of
+				// the back buffer. Leaving it bound could also be a problem,
+				// but since this is usually only used from custom shader
+				// sections they will take care of unbinding it automatically:
+				//forbid_view_cache = true;
+			}
+
+			//LogInfo("ParseTargetPipelineSlot: TOKEN_FOUND target=%ls\n", t.keyword);
+			return IniParserResult::TOKEN_FOUND;
+		}
+	}
+
+	return IniParserResult::TOKEN_NOT_FOUND;
+}
+
+bool contains_whitespace(const wchar_t* str, size_t len)
+{
+	while (len--)
+		if (iswspace(*str++))
+			return true;
+	return false;
+}
+
+bool ResourceCopyTarget::ParseTarget(Globals& G, const wchar_t* target, bool is_source, const std::wstring* ini_namespace, CommandListScope* scope)
+{
+	IniParserResult ret;
+	size_t length = wcslen(target);
+	std::wstring temp_target;
+
+	if (!target || length < 2)
+		return false;
+
+	// Consume an optional target prefix (`@` or `#`).
+	ret = ParseTargetPrefix(target, length);
+	//LogInfo("ParseTarget: %d at ParseTargetPrefix\n", ret);
+	if (ret == IniParserResult::SYNTAX_ERROR)
+		return false;
+
+	// Consume an optional resource member suffix (e.g. `->HashRegion(0, 16)` or `->Length`).
+	ret = ParseTargetMember(G, target, length, temp_target, ini_namespace, scope);
+	//LogInfo("ParseTarget: %d at ParseTargetMember\n", ret);
+	if (ret == IniParserResult::SYNTAX_ERROR)
+		return false;
+
+	// Reject whitespace: ParseTarget() expects a single token.
+	if (contains_whitespace(target, length))
+		return false;
+
+	// Parse the remainder as a custom resource (e.g. `ResourceFoo`).
+	ret = ParseTargetCustomResource(G, target, length, ini_namespace, scope);
+	//LogInfo("ParseTarget: %d at ParseTargetCustomResource\n", ret);
+	if (ret != IniParserResult::TOKEN_NOT_FOUND)
+		return ret == IniParserResult::TOKEN_FOUND;
+
+	// Parse the remainder as a resource pool (e.g. `PoolFoo`).
+	ret = ParseTargetPool(G, target, length, ini_namespace, scope);
+	//LogInfo("ParseTarget: %d at ParseTargetPool\n", ret);
+	if (ret != IniParserResult::TOKEN_NOT_FOUND)
+		return ret == IniParserResult::TOKEN_FOUND;
+
+	// Parse the remainder as a pipeline slot (e.g. `vb0`, `this`, `null`).
+	ret = ParseTargetPipelineSlot(target, length, is_source);
+	//LogInfo("ParseTarget: %d at ParseTargetPipelineSlot\n", ret);
+	if (ret != IniParserResult::TOKEN_NOT_FOUND)
+		return ret == IniParserResult::TOKEN_FOUND;
+
+	//LogInfo("ParseTarget: 0 at END\n");
 	return false;
 }
 
