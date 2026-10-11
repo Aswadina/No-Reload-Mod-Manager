@@ -53,7 +53,7 @@ function Invoke-SelfUpdate {
         Invoke-Native dart @('pub', 'global', 'activate', 'fastforge') -WorkingDirectory $repo | Out-Null
     }
     Write-Log "Building $short"
-    Invoke-Native dart @('pub', 'global', 'run', 'fastforge', 'package', '--platform', 'windows', '--target', 'exe') -WorkingDirectory $repo | Out-Null
+    Invoke-Native dart @('pub', 'global', 'run', 'fastforge:main', 'package', '--platform', 'windows', '--target', 'exe') -WorkingDirectory $repo | Out-Null
 
     $version = Get-PubspecVersion -PubspecPath (Join-Path $repo 'pubspec.yaml')
     $installer = Get-InstallerPath -RepoDir $repo -Version $version
