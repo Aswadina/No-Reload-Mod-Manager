@@ -56,7 +56,9 @@ Steps:
    reinstalls. It also avoids picking up unfinished work.
    - If there's a conflict: abort the merge, notify "Update needs a manual
      merge", and stop.
-4. If the resulting commit equals the last installed commit, stop (nothing new).
+4. If the resulting content (git tree hash) equals the last installed one, stop
+   (nothing new). Comparing content instead of the commit means a re-created
+   merge commit with the same files does not trigger a rebuild.
 5. Build: make sure fastforge is installed (`dart pub global activate
    fastforge`), then run `fastforge package --platform windows --target exe`.
    - If the build fails, or the installer is missing: notify, stop. Nothing is
@@ -65,10 +67,10 @@ Steps:
    If the push fails, log it and carry on, since the push is only a backup.
 7. Close the mod manager (`No_Reload_Mod_Manager.exe`), run the installer with
    `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`, and wait for it to finish.
-8. Relaunch the app from the install folder (`%APPDATA%\No Reload Mod
+8. If the app was running before step 7, relaunch it from the install folder (`%APPDATA%\No Reload Mod
    Manager\No_Reload_Mod_Manager.exe`). The installer skips its own launch
    step when it runs silently.
-9. Save the commit to `state.json` and show a Windows toast notification:
+9. Save the commit and tree hash to `state.json` and show a Windows toast notification:
    "Updated to <version> (<short commit>)".
 
 Same app ID and install folder as the official installer, so the new build
