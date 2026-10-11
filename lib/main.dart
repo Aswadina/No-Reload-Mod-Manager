@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
-import 'package:auto_updater/auto_updater.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -160,10 +159,7 @@ Future<void> setupWindow(List<String> args) async {
 
   await checkToRelaunch();
 
-  String feedURL =
-      'https://raw.githubusercontent.com/Aglglg/No-Reload-Mod-Manager/refs/heads/main/appcast.xml';
-  await autoUpdater.setFeedURL(feedURL);
-  await autoUpdater.setScheduledCheckInterval(0);
+  // Personal build: updates come from tools/self-update, not the upstream update feed.
 
   bitsdojo.doWhenWindowReady(() async {
     final minSize = Size(

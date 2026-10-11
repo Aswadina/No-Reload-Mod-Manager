@@ -850,7 +850,7 @@ In `setupWindow`, replace:
 with:
 
 ```dart
-  // Personal build: updates come from tools/self-update, not the upstream appcast.
+  // Personal build: updates come from tools/self-update, not the upstream update feed.
 ```
 
 - [ ] **Step 3: Point the settings button at the dialog**

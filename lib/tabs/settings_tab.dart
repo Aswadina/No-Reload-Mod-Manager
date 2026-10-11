@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
-import 'package:auto_updater/auto_updater.dart';
+import 'package:no_reload_mod_manager/custom/self_update_dialog.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/services.dart';
@@ -1110,10 +1110,14 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
                       Container(height: 15 * sss),
 
                       ElevatedButton(
-                        onPressed: () async {
-                          ref.read(windowIsPinnedProvider.notifier).state =
-                              false;
-                          await autoUpdater.checkForUpdates();
+                        onPressed: () {
+                          ref.read(alertDialogShownProvider.notifier).state =
+                              true;
+                          showDialog(
+                            barrierDismissible: false,
+                            context: context,
+                            builder: (context) => const SelfUpdateInfoDialog(),
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           overlayColor: Colors.white,
