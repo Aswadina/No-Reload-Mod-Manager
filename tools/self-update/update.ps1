@@ -17,6 +17,7 @@ Import-Module (Join-Path $PSScriptRoot 'SelfUpdate.psm1') -Force
 $cfg = Get-SelfUpdateConfig
 
 function Invoke-SelfUpdate {
+    Disable-GitPrompts
     foreach ($tool in 'git', 'flutter', 'dart') {
         if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "$tool is not on PATH." }
     }

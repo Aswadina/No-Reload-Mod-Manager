@@ -83,6 +83,20 @@ Describe 'Lock' {
         Set-Content -Path $path -Value '999999'
         Enter-Lock -Path $path | Should Be $true
     }
+    It 'takes over a lock whose PID now belongs to a process started after the lock was written' {
+        $path = Join-Path $TestDrive 'reused.lock'
+        Set-Content -Path $path -Value $PID
+        (Get-Item $path).LastWriteTime = (Get-Process -Id $PID).StartTime.AddMinutes(-1)
+        Enter-Lock -Path $path | Should Be $true
+    }
+    It 'takes over a lock older than 3 hours even if its PID is alive' {
+        $old = Get-Process | Where-Object { try { $_.StartTime -lt (Get-Date).AddHours(-5) } catch { $false } } | Select-Object -First 1
+        if (-not $old) { Set-TestInconclusive 'no process older than 5 hours to borrow a PID from' }
+        $path = Join-Path $TestDrive 'old.lock'
+        Set-Content -Path $path -Value $old.Id
+        (Get-Item $path).LastWriteTime = (Get-Date).AddHours(-4)
+        Enter-Lock -Path $path | Should Be $true
+    }
     It 'takes over an empty lock file' {
         $path = Join-Path $TestDrive 'empty.lock'
         New-Item -ItemType File -Path $path | Out-Null
@@ -192,6 +206,11 @@ Describe 'Initialize-BuilderRepo and Reset-ToBranch' {
         { Initialize-BuilderRepo -RepoDir $clone -OriginUrl $origin -UpstreamUrl 'https://example.com/up.git' -Branch 'my-version' } |
             Should Not Throw
     }
+    It 'Reset-ToBranch removes a leftover git index.lock from a killed run' {
+        Set-Content -Path (Join-Path $clone '.git\index.lock') -Value ''
+        { Reset-ToBranch -RepoDir $clone -Branch 'my-version' } | Should Not Throw
+        Test-Path (Join-Path $clone '.git\index.lock') | Should Be $false
+    }
     It 'Reset-ToBranch recovers a dirty, half-merged clone' {
         Set-Content -Path (Join-Path $clone 'a.txt') -Value 'local edit'
         Set-Content -Path (Join-Path $clone 'junk.txt') -Value 'untracked'
@@ -204,5 +223,19 @@ Describe 'Initialize-BuilderRepo and Reset-ToBranch' {
         Test-Path (Join-Path $clone 'junk.txt') | Should Be $false
         (Get-Content (Join-Path $clone 'a.txt')) | Should Be 'base'
         (Invoke-Native git @('status', '--porcelain') -WorkingDirectory $clone).Output.Count | Should Be 0
+    }
+}
+
+Describe 'Disable-GitPrompts' {
+    It 'turns off git credential pop-ups and terminal prompts' {
+        $saved = @($env:GCM_INTERACTIVE, $env:GIT_TERMINAL_PROMPT)
+        try {
+            Disable-GitPrompts
+            $env:GCM_INTERACTIVE | Should Be 'never'
+            $env:GIT_TERMINAL_PROMPT | Should Be '0'
+        } finally {
+            $env:GCM_INTERACTIVE = $saved[0]
+            $env:GIT_TERMINAL_PROMPT = $saved[1]
+        }
     }
 }

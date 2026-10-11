@@ -98,7 +98,18 @@ function Enter-Lock {
         $oldPid = 0
         $content = "$(Get-Content -LiteralPath $Path -Raw)".Trim()
         [void][int]::TryParse($content, [ref]$oldPid)
-        if ($oldPid -gt 0 -and (Get-Process -Id $oldPid -ErrorAction SilentlyContinue)) { return $false }
+        if ($oldPid -gt 0) {
+            # The lock only counts if it is younger than the task's 2-hour limit and
+            # its PID still belongs to the process that wrote it (PIDs get reused).
+            $written = (Get-Item -LiteralPath $Path).LastWriteTime
+            $isFresh = $written -gt (Get-Date).AddHours(-3)
+            $owner = Get-Process -Id $oldPid -ErrorAction SilentlyContinue
+            $isOwner = $false
+            if ($owner) {
+                try { $isOwner = $owner.StartTime -le $written } catch { $isOwner = $true }
+            }
+            if ($isFresh -and $isOwner) { return $false }
+        }
     }
     $dir = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
@@ -196,8 +207,16 @@ function Reset-ToBranch {
     param([string]$RepoDir, [string]$Branch)
     Invoke-Native git @('merge', '--abort') -WorkingDirectory $RepoDir -AllowFailure | Out-Null
     Remove-Item -LiteralPath (Join-Path $RepoDir '.git\MERGE_HEAD') -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $RepoDir '.git\index.lock') -Force -ErrorAction SilentlyContinue
     Invoke-Native git @('checkout', '-f', '-B', $Branch, "origin/$Branch") -WorkingDirectory $RepoDir | Out-Null
     Invoke-Native git @('clean', '-fd') -WorkingDirectory $RepoDir | Out-Null
+}
+
+# The job runs unattended, so a sign-in prompt would hang it until the task's
+# time limit. With prompts off, an expired credential just fails the push.
+function Disable-GitPrompts {
+    $env:GCM_INTERACTIVE = 'never'
+    $env:GIT_TERMINAL_PROMPT = '0'
 }
 
 function Invoke-UpstreamMerge {
