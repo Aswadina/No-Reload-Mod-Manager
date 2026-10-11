@@ -1,3 +1,4 @@
+import 'package:no_reload_mod_manager/custom/only_equipped.dart';
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui';
@@ -2067,6 +2068,8 @@ class _GameSettingsState extends ConsumerState<GameSettings> {
               fontWeight: FontWeight.w500,
             ),
           ),
+          Container(height: 15 * sss),
+          const OnlyEquippedSettingTile(),
           Container(height: 15 * sss),
 
           Row(

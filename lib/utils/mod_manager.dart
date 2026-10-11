@@ -1,3 +1,4 @@
+import 'package:no_reload_mod_manager/custom/only_equipped.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -1069,6 +1070,7 @@ Future<List<TextSpan>> restoreManagedMod(List<Directory> modDirs) async {
   bool containsError = false;
 
   for (Directory folder in modDirs) {
+    await unhideModInis(folder.path); //only-equipped mode
     List<String> iniFiles = await _findIniFilesRecursive(folder.path);
     for (final iniFile in iniFiles) {
       bool modified = false;
@@ -1240,6 +1242,9 @@ Future<List<TextSpan>> updateModData(
 
     final managedPath = preparing.$1;
     needReloadManual = preparing.$2;
+
+    //Only-equipped mode: bring back hidden inis so every mod is processed
+    await unhideModInis(managedPath);
 
     //Get all mods for each group directly and once
     final groupFullPathsAndIndexes = await getGroupFolders(
@@ -1455,6 +1460,9 @@ Future<List<TextSpan>> updateModData(
           ]);
         }(),
     ]);
+
+    //Only-equipped mode: hide the inis of mods that aren't equipped
+    await applyLoadModesToAllGroups(managedPath, targetGame);
 
     stopwatch.stop();
 

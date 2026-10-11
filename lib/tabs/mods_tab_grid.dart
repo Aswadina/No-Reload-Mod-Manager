@@ -1,3 +1,4 @@
+import 'package:no_reload_mod_manager/custom/only_equipped.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
@@ -16,7 +17,6 @@ import 'package:no_reload_mod_manager/utils/auto_group_icon.dart';
 import 'package:no_reload_mod_manager/utils/constant_var.dart';
 import 'package:no_reload_mod_manager/utils/custom_menu_item.dart';
 import 'package:no_reload_mod_manager/utils/external_editors.dart';
-import 'package:no_reload_mod_manager/utils/keypress_simulator_manager.dart';
 import 'package:no_reload_mod_manager/utils/managedfolder_watcher.dart';
 import 'package:no_reload_mod_manager/utils/mod_manager.dart';
 import 'package:no_reload_mod_manager/utils/mod_navigator.dart';
@@ -321,12 +321,10 @@ class _ModAreaGridState extends ConsumerState<ModAreaGrid>
                           onSelected: () async {
                             _scrollToItem(modData.key);
                             unawaited(
-                              simulateKeySelectMod(
-                                widget.currentGroupData.realIndex,
-                                widget
-                                    .currentGroupData
-                                    .modsInGroup[modData.key]
-                                    .realIndex,
+                              selectModWithLoadMode(
+                                ref.read(targetGameProvider),
+                                widget.currentGroupData,
+                                modData.key,
                               ),
                             );
                             unawaited(
@@ -951,6 +949,7 @@ class _GroupAreaState extends ConsumerState<GroupAreaGrid>
                                 scale: sss,
                                 label: 'Group icon'.tr(),
                               ),
+                              loadModeMenu(ref, groupData.groupPath, sss),
                               CustomMenuItem.submenu(
                                 label: "Open with".tr(),
                                 scale: sss,

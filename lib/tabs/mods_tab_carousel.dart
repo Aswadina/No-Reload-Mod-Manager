@@ -1,3 +1,4 @@
+import 'package:no_reload_mod_manager/custom/only_equipped.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -16,7 +17,6 @@ import 'package:no_reload_mod_manager/utils/auto_group_icon.dart';
 import 'package:no_reload_mod_manager/utils/constant_var.dart';
 import 'package:no_reload_mod_manager/utils/custom_menu_item.dart';
 import 'package:no_reload_mod_manager/utils/external_editors.dart';
-import 'package:no_reload_mod_manager/utils/keypress_simulator_manager.dart';
 import 'package:no_reload_mod_manager/utils/managedfolder_watcher.dart';
 import 'package:no_reload_mod_manager/utils/mod_manager.dart';
 import 'package:no_reload_mod_manager/utils/mod_navigator.dart';
@@ -699,6 +699,8 @@ class _GroupAreaState extends ConsumerState<GroupAreaCarousel>
                             scale: sss,
                             label: 'Group icon'.tr(),
                           ),
+                        if (index == currentPageIndex)
+                          loadModeMenu(ref, groupData.groupPath, sss),
                         if (index == currentPageIndex)
                           CustomMenuItem.submenu(
                             label: "Open with".tr(),
@@ -1554,9 +1556,10 @@ class _ModAreaState extends ConsumerState<ModAreaCarousel>
                 isActiveInGrid: false,
                 onSelected: () async {
                   unawaited(
-                    simulateKeySelectMod(
-                      widget.currentGroupData.realIndex,
-                      widget.currentGroupData.modsInGroup[index].realIndex,
+                    selectModWithLoadMode(
+                      ref.read(targetGameProvider),
+                      widget.currentGroupData,
+                      index,
                     ),
                   );
                   unawaited(

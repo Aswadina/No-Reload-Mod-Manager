@@ -1,3 +1,4 @@
+import 'package:no_reload_mod_manager/custom/only_equipped.dart';
 import 'dart:io';
 
 import 'package:collection/collection.dart';
@@ -359,6 +360,10 @@ class _GroupContainerState extends ConsumerState<GroupContainer> {
                                   ),
                             ),
                   ),
+                ),
+                OnlyEquippedBadge(
+                  groupPath:
+                      ref.watch(modGroupDataProvider)[widget.index].groupPath,
                 ),
                 if (_draggingOnGroup)
                   Positioned.fill(
