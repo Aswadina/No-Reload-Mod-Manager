@@ -147,4 +147,65 @@ function Show-Toast {
     }
 }
 
+# Runs a native command, logs its output, and throws on a non-zero exit code.
+# ErrorActionPreference is relaxed locally because Windows PowerShell 5.1 turns
+# native stderr lines into error records, and tools like git write progress there.
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [string]$WorkingDirectory = (Get-Location).Path,
+        [switch]$AllowFailure
+    )
+    Push-Location -LiteralPath $WorkingDirectory
+    $oldPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $FilePath @ArgumentList 2>&1 | ForEach-Object { "$_" })
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldPreference
+        Pop-Location
+    }
+    foreach ($line in $output) { Write-Log "  $line" }
+    if ($code -ne 0 -and -not $AllowFailure) {
+        throw "'$FilePath $($ArgumentList -join ' ')' failed with exit code $code"
+    }
+    return [pscustomobject]@{ ExitCode = $code; Output = $output }
+}
+
+function Initialize-BuilderRepo {
+    param([string]$RepoDir, [string]$OriginUrl, [string]$UpstreamUrl, [string]$Branch)
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoDir '.git'))) {
+        $parent = Split-Path -Parent $RepoDir
+        if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+        Write-Log "Cloning $OriginUrl ($Branch) into $RepoDir"
+        Invoke-Native git @('clone', '--branch', $Branch, $OriginUrl, $RepoDir) -WorkingDirectory $parent | Out-Null
+    }
+    $remotes = (Invoke-Native git @('remote') -WorkingDirectory $RepoDir).Output
+    if ($remotes -contains 'upstream') {
+        Invoke-Native git @('remote', 'set-url', 'upstream', $UpstreamUrl) -WorkingDirectory $RepoDir | Out-Null
+    } else {
+        Invoke-Native git @('remote', 'add', 'upstream', $UpstreamUrl) -WorkingDirectory $RepoDir | Out-Null
+    }
+}
+
+# Throws away any local state in the builder clone. Safe because the job owns
+# this clone; ignored folders such as build/ are kept so Flutter builds stay fast.
+function Reset-ToBranch {
+    param([string]$RepoDir, [string]$Branch)
+    Invoke-Native git @('merge', '--abort') -WorkingDirectory $RepoDir -AllowFailure | Out-Null
+    Remove-Item -LiteralPath (Join-Path $RepoDir '.git\MERGE_HEAD') -Force -ErrorAction SilentlyContinue
+    Invoke-Native git @('checkout', '-f', '-B', $Branch, "origin/$Branch") -WorkingDirectory $RepoDir | Out-Null
+    Invoke-Native git @('clean', '-fd') -WorkingDirectory $RepoDir | Out-Null
+}
+
+function Invoke-UpstreamMerge {
+    param([string]$RepoDir, [string]$Ref)
+    $result = Invoke-Native git @('merge', '--no-edit', '-m', "Merge upstream release $Ref", $Ref) -WorkingDirectory $RepoDir -AllowFailure
+    if ($result.ExitCode -eq 0) { return $true }
+    Invoke-Native git @('merge', '--abort') -WorkingDirectory $RepoDir -AllowFailure | Out-Null
+    return $false
+}
+
 Export-ModuleMember -Function *
