@@ -8,6 +8,9 @@
   Rebuild even if nothing changed since the last install.
 .EXAMPLE
   powershell -NoProfile -ExecutionPolicy Bypass -File tools\self-update\update.ps1 -DryRun
+.NOTES
+  The scheduled task runs this file from the builder clone. If a bad push ever
+  breaks this script, push the fix and re-run install-task.ps1 to reset the clone.
 #>
 [CmdletBinding()]
 param([switch]$DryRun, [switch]$Force)
