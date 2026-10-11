@@ -239,3 +239,13 @@ Describe 'Disable-GitPrompts' {
         }
     }
 }
+
+Describe 'Start-App' {
+    It 'starts the exe and returns true' {
+        $exe = Join-Path $env:windir 'System32\PING.EXE'
+        Start-App -AppExe $exe | Should Be $true
+    }
+    It 'returns false instead of throwing when the exe is missing' {
+        Start-App -AppExe (Join-Path $TestDrive 'missing\App.exe') | Should Be $false
+    }
+}

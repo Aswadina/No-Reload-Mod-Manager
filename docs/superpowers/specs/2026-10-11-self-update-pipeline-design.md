@@ -67,8 +67,10 @@ Steps:
    If the push fails, log it and carry on, since the push is only a backup.
 7. Close the mod manager (`No_Reload_Mod_Manager.exe`), run the installer with
    `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`, and wait for it to finish.
-8. If the app was running before step 7, relaunch it from the install folder (`%APPDATA%\No Reload Mod
-   Manager\No_Reload_Mod_Manager.exe`). The installer skips its own launch
+8. Always start the app from the install folder afterwards, even if it wasn't
+   open (changed 2026-10-11 at the user's request). On a failed install this
+   brings back the previous version. Path: (`%APPDATA%\No Reload Mod
+   Manager\No_Reload_Mod_Manager.exe`. The installer skips its own launch
    step when it runs silently.
 9. Save the commit and tree hash to `state.json` and show a Windows toast notification:
    "Updated to <version> (<short commit>)".

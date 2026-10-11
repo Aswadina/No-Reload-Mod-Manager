@@ -140,6 +140,18 @@ function Stop-App {
     return $true
 }
 
+# Never throws, so a failed launch can't hide the real reason a run failed.
+function Start-App {
+    param([string]$AppExe)
+    try {
+        Start-Process -FilePath $AppExe -WorkingDirectory (Split-Path -Parent $AppExe) -ErrorAction Stop
+        return $true
+    } catch {
+        Write-Log "Could not start the app: $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Show-Toast {
     param([string]$Title, [string]$Message)
     try {

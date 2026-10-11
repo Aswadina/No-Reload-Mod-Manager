@@ -80,13 +80,15 @@ function Invoke-SelfUpdate {
     $wasRunning = Stop-App -ProcessName $cfg.ProcessName
     Write-Log "Installing (app was running: $wasRunning)"
     $proc = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
+    # Always start the app afterwards, even if it wasn't open. On a failed
+    # install this brings back the previous version.
     if ($proc.ExitCode -ne 0) {
-        if ($wasRunning) { Start-Process -FilePath $cfg.AppExe -WorkingDirectory (Split-Path -Parent $cfg.AppExe) }
+        [void](Start-App -AppExe $cfg.AppExe)
         throw "Installer exited with code $($proc.ExitCode)"
     }
 
     Write-State -Path $cfg.StatePath -Tree $tree -Commit $commit -Version $version
-    if ($wasRunning) { Start-Process -FilePath $cfg.AppExe -WorkingDirectory (Split-Path -Parent $cfg.AppExe) }
+    [void](Start-App -AppExe $cfg.AppExe)
     Write-Log "Installed $version ($short)."
     Show-Toast 'NRMM updated' "Now running $version ($short) with your changes."
     return 0
