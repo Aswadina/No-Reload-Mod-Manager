@@ -14,7 +14,7 @@ without me doing anything. Windows only, for one user, no public releases.
 | Branch | Purpose |
 |---|---|
 | `upstream` (remote) | The original creator's repo. Read only. |
-| `main` | Pure copy of `upstream/main`. Never edited by hand. |
+| `main` | Pure copy of `upstream/main`, kept as a backup. Never edited by hand. |
 | `my-version` | My app. Starts from `Reorder-groups`. Features branch off it and merge back into it. |
 
 ## One-time changes in `my-version`
@@ -49,7 +49,11 @@ Steps:
 1. Fetch `upstream` and `origin` (my fork).
 2. Check out `my-version` and reset it to `origin/my-version`. This is the
    job's own clone, so nothing is lost.
-3. Merge `upstream/main` into `my-version`.
+3. Find the newest release tag on `upstream` (`v*`, sorted by version number)
+   and merge it into `my-version`. The job follows releases, not `main`.
+   Most commits on `main` between releases are icon data, which the app
+   already downloads at runtime, so rebuilding for them would cause pointless
+   reinstalls. It also avoids picking up unfinished work.
    - If there's a conflict: abort the merge, notify "Update needs a manual
      merge", and stop.
 4. If the resulting commit equals the last installed commit, stop (nothing new).
@@ -93,8 +97,8 @@ and pushing `my-version`) picks up where it left off.
 
 ## Testing
 
-1. Run `update.ps1 -DryRun`. It should merge the 79 upstream commits and build
-   an installer.
+1. Run `update.ps1 -DryRun`. It should merge `v3.2.3` (64 commits, which
+   merge cleanly, as checked on 2026-10-11) and build an installer.
 2. Run `update.ps1` by hand. Check that the installed version in Windows Apps
    matches the build, that the app reopens, that drag-to-reorder groups works,
    and that the settings "check for updates" button shows the new message.
