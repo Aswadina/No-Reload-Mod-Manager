@@ -142,6 +142,11 @@ static IniSections::iterator prefix_upper_bound(IniSections& sections, std::wstr
 	return sections.end();
 }
 
+inline wchar_t ascii_tolower(wchar_t c)
+{
+	return (c >= L'A' && c <= L'Z') ? c + (L'a' - L'A') : c;
+}
+
 static bool get_namespaced_section_name(const std::wstring* section, const std::wstring* ini_namespace, std::wstring* ret)
 {
 	const wchar_t* section_prefix = SectionPrefix(section->c_str());
@@ -163,10 +168,12 @@ bool get_namespaced_section_name_lower(const std::wstring* section, const std::w
 	return rc;
 }
 
-std::wstring get_namespaced_var_name_lower(const std::wstring var, const std::wstring* ini_namespace)
+std::wstring get_namespaced_var_name_lower(const std::wstring& low_name, const std::wstring* ini_namespace)
 {
-	std::wstring ret = std::wstring(L"$\\") + *ini_namespace + std::wstring(L"\\") + var.substr(1);
-	std::transform(ret.begin(), ret.end(), ret.begin(), ::towlower);
+	std::wstring ret = L"$\\" + *ini_namespace + L'\\';
+	auto namespace_begin = ret.begin() + 2;  // Skip "$\\"
+	std::transform(namespace_begin, namespace_begin + ini_namespace->size(), namespace_begin, ::towlower);
+	ret.append(low_name, 1, std::wstring::npos);
 	return ret;
 }
 
@@ -237,16 +244,16 @@ static bool _get_namespaced_section_path(IniSections* custom_ini_sections, const
 
 static void ParseIniSectionLine(Globals& G, std::wstring* wline, std::wstring* section,
 	int* warn_duplicates, bool* warn_lines_without_equals,
-	IniSectionVector** section_vector, const std::wstring* ini_namespace,
+	IniSection** section_entry, const std::wstring* ini_namespace,
 	const std::wstring* ini_path, const std::wstring& full_path, int line_index)
 {
 	bool allow_duplicate_sections = false;
 	size_t first, last;
-	bool inserted;
 	bool namespaced_section = false;
 
 	*warn_duplicates = 1;
 	*warn_lines_without_equals = true;
+	*section_entry = NULL;
 
 	last = wline->find(L']');
 	if (last == wline->npos)
@@ -275,8 +282,10 @@ static void ParseIniSectionLine(Globals& G, std::wstring* wline, std::wstring* s
 		}
 	}
 
-	inserted = G.ini_sections.emplace(*section, IniSection{}).second;
-	if (!inserted && !allow_duplicate_sections) {
+	// the behaviour of GetPrivateProfileString.
+	std::pair<IniSections::iterator, bool> result = G.ini_sections.emplace(*section, IniSection{});
+
+	if (!result.second && !allow_duplicate_sections) {
 		//wprintf(L"[WARNING] Duplicate section found - [%ls]\n", section->c_str());
 
 		//If duplicate section on known lib namespaces, that means user having multiple known libraries
@@ -315,17 +324,18 @@ static void ParseIniSectionLine(Globals& G, std::wstring* wline, std::wstring* s
 		}
 
 		section->clear();
-		*section_vector = NULL;
 		return;
 	}
 
-	*section_vector = &G.ini_sections[*section].kv_vec;
+	IniSection* entry = &result.first->second;
+	*section_entry = entry;
+
 	G.ini_sections[*section].full_path = full_path;
 
 	if (namespaced_section) {
-		G.ini_sections[*section].ini_namespace = *ini_namespace;
+		entry->ini_namespace = *ini_namespace;
 		if (*ini_path != *ini_namespace)
-			G.ini_sections[*section].ini_path = *ini_path;
+			entry->ini_path = *ini_path;
 	}
 
 	if (IsCommandListSection(section->c_str())) {
@@ -405,13 +415,13 @@ static bool ParseIniPreamble(Globals& G, std::wstring* wline, std::wstring* ini_
 
 static void ParseIniKeyValLine(Globals& G, std::wstring* wline, std::wstring* section,
 	int warn_duplicates, bool warn_lines_without_equals,
-	IniSectionVector* section_vector, const std::wstring* ini_namespace, const std::wstring* full_path, int line_index)
+	IniSection* section_entry, const std::wstring* ini_namespace, const std::wstring* full_path, int line_index)
 {
 	size_t first, last, delim;
 	std::wstring key, val;
 	bool inserted;
 
-	if (section->empty() || section_vector == NULL) {
+	if (section->empty() || section_entry == NULL) {
 		//wprintf(L"[WARNING] Entry outside of section: %ls - [%ls]\n", wline->c_str(), ini_namespace->c_str());
 		return;
 	}
@@ -421,6 +431,7 @@ static void ParseIniKeyValLine(Globals& G, std::wstring* wline, std::wstring* se
 		last = wline->find_last_not_of(L" \t", delim - 1);
 		key = wline->substr(0, last + 1);
 		first = wline->find_first_not_of(L" \t", delim + 1);
+
 		if (first != wline->npos)
 			val = wline->substr(first);
 		else {
@@ -429,10 +440,10 @@ static void ParseIniKeyValLine(Globals& G, std::wstring* wline, std::wstring* se
 		}
 
 		if (warn_duplicates == 2) {
-			G.ini_sections.at(*section).kv_map[key] = val;
+			section_entry->kv_map[key] = val;
 		}
 		else {
-			inserted = G.ini_sections.at(*section).kv_map.emplace(key, val).second;
+			inserted = section_entry->kv_map.emplace(key, val).second;
 			if ((warn_duplicates == 1) && !inserted && !whitelisted_duplicate_key(section->c_str(), key.c_str())) {
 				//wprintf(L"[WARNING] Duplicate key found: %ls - [%ls] @ [%ls]\n", wline->c_str(), section->c_str(), ini_namespace->c_str());
 			}
@@ -445,7 +456,7 @@ static void ParseIniKeyValLine(Globals& G, std::wstring* wline, std::wstring* se
 		}
 	}
 
-	section_vector->emplace_back(key, val, *wline, *ini_namespace, *full_path, line_index);
+	section_entry->kv_vec.emplace_back(key, val, *wline, *ini_namespace, *full_path, line_index);
 }
 
 static void ParseIniBuffer(Globals& G, const char* data, size_t size, const std::wstring* _ini_namespace, std::wstring& full_path)
@@ -459,7 +470,10 @@ static void ParseIniBuffer(Globals& G, const char* data, size_t size, const std:
 	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 
 	std::wstring wline, section, ini_path;
+
 	IniSectionVector* section_vector = NULL;
+	IniSection* section_entry = NULL;
+
 	int warn_duplicates = 1;
 	bool warn_lines_without_equals = true;
 	std::wstring ini_namespace = _ini_namespace ? *_ini_namespace : L"";
@@ -505,7 +519,7 @@ static void ParseIniBuffer(Globals& G, const char* data, size_t size, const std:
 		if (wline[0] == L'[') {
 			preamble = false;
 			ParseIniSectionLine(G, &wline, &section, &warn_duplicates, &warn_lines_without_equals,
-				&section_vector, &ini_namespace, &ini_path, full_path, line_index);
+				&section_entry, &ini_namespace, &ini_path, full_path, line_index);
 			continue;
 		}
 
@@ -516,7 +530,7 @@ static void ParseIniBuffer(Globals& G, const char* data, size_t size, const std:
 		}
 
 		ParseIniKeyValLine(G, &wline, &section, warn_duplicates, warn_lines_without_equals,
-			section_vector, &ini_namespace, &full_path, line_index);
+			section_entry, &ini_namespace, &full_path, line_index);
 	}
 }
 
@@ -698,6 +712,22 @@ void GetIniSection(Globals& G, IniSectionVector** key_vals, const wchar_t* secti
 	return _GetIniSection(&G.ini_sections, key_vals, section);
 }
 
+const std::wstring& GetIniSectionNamespace(Globals& G, const wchar_t* section)
+{
+	auto it = G.ini_sections.find(section);
+
+	if (it != G.ini_sections.end() && !it->second.ini_namespace.empty())
+		return it->second.ini_namespace;
+
+	//return G->gDefaultNamespace;
+	return L"d3dx.ini";
+}
+
+const std::wstring& GetIniNamespace(Globals& G, const wchar_t* section, const std::wstring* override)
+{
+	return override ? *override : GetIniSectionNamespace(G, section);
+}
+
 int GetIniString(Globals& G, const wchar_t* section, const wchar_t* key, const wchar_t* def,
 	wchar_t* ret, unsigned size)
 {
@@ -804,72 +834,287 @@ static bool GetIniStringAndLog(Globals& G, const wchar_t* section, const wchar_t
 	return rc;
 }
 
-//I think we don't need to know the value for only parsing conditional lines, but okay, let it be, because I'm lazy.
-static float GetIniConstant(Globals& G, const wchar_t* section, const wchar_t* val, bool* found)
+const std::wstring* GetIniWstring(Globals& G, const wchar_t* section, const wchar_t* key)
 {
-	if (!val || val[0] != L'$') {
-		if (found)
-			*found = false;
-		return 0;
+	auto section_it = G.ini_sections.find(section);
+	if (section_it == G.ini_sections.end())
+		return nullptr;
+
+	auto value_it = section_it->second.kv_map.find(key);
+	if (value_it == section_it->second.kv_map.end())
+		return nullptr;
+
+	return &value_it->second;
+}
+
+inline std::wstring NormalizeString(const std::wstring& value)
+{
+	std::wstring normalized = value;
+	std::transform(normalized.begin(), normalized.end(), normalized.begin(), towlower);
+	return normalized;
+}
+
+bool ParseBinaryLiterals(const std::wstring& input, size_t start, uint64_t& out, size_t& length)
+{
+	uint64_t value = 0;
+	length = 0;
+
+	for (; start < input.size(); ++start, ++length)
+	{
+		const wchar_t c = input[start];
+
+		if (c != L'0' && c != L'1')
+			break;
+
+		// uint64_t can hold at most 64 binary digits.
+		if (length >= 64)
+			return false;
+
+		value <<= 1;
+
+		if (c == L'1')
+			value |= 1;
 	}
 
-	std::wstring var_name(val);
-	std::wstring ini_namespace = G.ini_sections[section].ini_namespace;
+	if (length == 0)
+		return false;
 
-	CommandListVariables::iterator var = G.command_list_globals.find(get_namespaced_var_name_lower(var_name, &ini_namespace));
+	out = value;
+	return true;
+}
 
-	if (var == G.command_list_globals.end()) {
-		//IniWarningW(L"Constant variable %ls is not defined!\n - [%ls] @ [%ls]\n", val, section, ini_namespace.c_str());
-		if (found)
-			*found = false;
-		return 0;
+template<typename T, typename Converter>
+bool ParseIniExpression(
+	Globals& G,
+	const std::wstring* ini_namespace_override,
+	const wchar_t* section,
+	const wchar_t* key,
+	const std::wstring& value,
+	T& out,
+	bool warn,
+	Converter&& convert,
+	bool normalize = true)
+{
+	const std::wstring& ini_namespace = GetIniNamespace(G, section, ini_namespace_override);
+
+	// Expression parsing is case-insensitive.
+	const std::wstring& expression_text = normalize ? NormalizeString(value) : value;
+
+	CommandListExpression expression;
+
+	if (!expression.parse(G, &expression_text, &ini_namespace, nullptr))
+	{
+		if (warn)
+		{
+			/*IniWarningW(
+				L"Unable to parse %ls expression for \"%ls\": \"%ls\"\n"
+				L" - [%ls] @ [%ls]\n",
+				IniValueTypeName<T>::value, key, value.c_str(),
+				section, ini_namespace.c_str());*/
+		}
+		return false;
 	}
 
+	float expression_value;
+
+	if (!expression.static_evaluate(&expression_value, true))
+	{
+		if (warn)
+		{
+			/*IniWarningW(
+				L"%ls expression for \"%ls\" cannot be statically evaluated: \"%ls\"\n"
+				L" - [%ls] @ [%ls]\n",
+				IniValueTypeName<T>::value, key, value.c_str(),
+				section, ini_namespace.c_str());*/
+		}
+		return false;
+	}
+
+	if (!convert(expression_value, out))
+	{
+		if (warn)
+		{
+			/*IniWarningW(
+				L"Expression result \"%f\" for \"%ls\" %ls conversion is invalid: \"%ls\"\n"
+				L" - [%ls] @ [%ls]\n",
+				expression_value, key, IniValueTypeName<T>::value, value.c_str(),
+				section, ini_namespace.c_str());*/
+		}
+		return false;
+	}
+
+	return true;
+}
+
+inline void SetFound(bool* found, bool value) noexcept
+{
 	if (found)
-		*found = true;
+		*found = value;
+}
 
-	return var->second.fval;
+template<typename T, typename Parser, typename Logger>
+T GetIniValue(
+	Globals& G,
+	const wchar_t* section,
+	const wchar_t* key,
+	T def,
+	bool* found,
+	bool warn,
+	Parser&& parser,
+	Logger&& logger)
+{
+	SetFound(found, false);
+
+	const std::wstring* val = GetIniWstring(G, section, key);
+	if (!val)
+		return def;
+
+	if (val->empty())
+	{
+		if (warn)
+		{
+			/*IniWarningW(
+				L"Unable to parse %ls value for \"%ls\" from empty string\n"
+				L" - [%ls] @ [%ls]\n",
+				IniValueTypeName<T>::value, key,
+				section, GetIniSectionNamespace(section).c_str());*/
+		}
+		return def;
+	}
+
+	T result{};
+	if (!parser(G, section, key, *val, result, warn, nullptr))
+		return def;
+
+	SetFound(found, true);
+
+	logger(key, result);
+
+	return result;
+}
+
+inline bool ConvertExpressionToFloat(float expr, float& out) noexcept
+{
+	// Preserve the evaluated IEEE-754 value, including NaN and �infinity.
+	out = expr;
+	return true;
+}
+
+bool ParseFloatValue(Globals& G, const wchar_t* section, const wchar_t* key, const std::wstring& val, float& out, bool warn = true, const std::wstring* ini_namespace_override = nullptr)
+{
+	wchar_t* end = nullptr;
+	errno = 0;
+	out = std::wcstof(val.c_str(), &end); // TODO: C++17: use std::from_chars.
+
+	if (*end == L'\0')
+	{
+		if (errno == ERANGE)
+		{
+			// Treat floating-point overflow as �infinity.
+			out = std::signbit(out) ? -std::numeric_limits<float>::infinity() : std::numeric_limits<float>::infinity();
+		}
+		return true;
+	}
+
+	return ParseIniExpression(G, ini_namespace_override, section, key, val, out, warn, ConvertExpressionToFloat);
+}
+
+inline void LogIniFloat(const wchar_t* key, float value)
+{
+	//LogInfoW(L"  %ls=%f\n", key, value);
+}
+
+float GetIniFloat(Globals& G, const wchar_t* section, const wchar_t* key, float def, bool* found)
+{
+	return GetIniValue(G, section, key, def, found, true, ParseFloatValue, LogIniFloat);
+}
+
+inline bool ConvertExpressionToInt(float expr, int& out) noexcept
+{
+	// Saturate infinities and out-of-range values. Map NaN to zero.
+	if (std::isnan(expr))
+		out = 0;
+	else if (expr <= static_cast<float>(INT_MIN))
+		out = INT_MIN;
+	else if (expr >= static_cast<float>(INT_MAX))
+		out = INT_MAX;
+	else
+		out = static_cast<int>(expr);
+
+	return true;
+}
+
+bool ParseIntValue(Globals& G, const wchar_t* section, const wchar_t* key, const std::wstring& val, int& out, bool warn = false, const std::wstring* ini_namespace_override = nullptr)
+{
+	wchar_t* end = nullptr;
+	errno = 0;
+	long long n = std::wcstoll(val.c_str(), &end, 10); // TODO: C++17: use std::from_chars
+
+	if (*end == L'\0') {
+		if (errno == ERANGE)
+		{
+			// Saturate integer literal overflow.
+			out = (n < 0) ? INT_MIN : INT_MAX;
+		}
+		else
+		{
+			if (n < INT_MIN)
+				out = INT_MIN;
+			else if (n > INT_MAX)
+				out = INT_MAX;
+			else
+				out = static_cast<int>(n);
+		}
+		return true;
+	}
+
+	return ParseIniExpression(G, ini_namespace_override, section, key, val, out, warn, ConvertExpressionToInt);
+}
+
+inline void LogIniInt(const wchar_t* key, int value)
+{
+	//LogInfoW(L"  %ls=%d\n", key, value);
 }
 
 int GetIniInt(Globals& G, const wchar_t* section, const wchar_t* key, int def, bool* found, bool warn)
 {
-	wchar_t val[32];
-	int ret = def;
+	return GetIniValue<int>(G, section, key, def, found, warn, ParseIntValue, LogIniInt);
+}
 
-	if (found)
-		*found = false;
+inline bool ConvertExpressionToBool(float expr, bool& out) noexcept
+{
+	// NaN is false; all other non-zero values (including �infinity) are true.
+	out = !std::isnan(expr) && expr != 0.0f;
+	return true;
+}
 
-	if (GetIniString(G, section, key, 0, val, 32)) {
-		bool constant_found = false;
+bool ParseBoolValue(Globals& G, const wchar_t* section, const wchar_t* key, const std::wstring& val, bool& out, bool warn = false, const std::wstring* ini_namespace_override = nullptr)
+{
+	std::wstring normalized = NormalizeString(val);
 
-		ret = (int)GetIniConstant(G, section, val, &constant_found);
-
-		if (constant_found) {
-			if (found)
-				*found = true;
-			//LogInfo("  %S=%d\n", key, ret);
-			return ret;
-		}
-
-		int len;
-		if (swscanf_s(val, L"%d%n", &ret, &len) != 1 || len != wcslen(val)) {
-			if (warn) {
-				std::wstring ini_namespace = G.ini_sections[section].ini_namespace;
-				if (ini_namespace.empty()) {
-					ini_namespace = L"d3dx.ini";
-				}
-				//wprintf(L"WARNING: Integer parse error: %ls=%ls\n - [%ls] @ [%ls]\n", key, val, section, ini_namespace.c_str());
-			}
-			ret = def;
-		}
-		else {
-			if (found)
-				*found = true;
-			//LogInfo("  %S=%d\n", key, ret);
-		}
+	if (normalized == L"1" || normalized == L"true" || normalized == L"yes" || normalized == L"on")
+	{
+		out = true;
+		return true;
 	}
 
-	return ret;
+	if (normalized == L"0" || normalized == L"false" || normalized == L"no" || normalized == L"off")
+	{
+		out = false;
+		return true;
+	}
+
+	return ParseIniExpression(G, ini_namespace_override, section, key, normalized, out, warn, ConvertExpressionToBool, false);
+}
+
+inline void LogIniBool(const wchar_t* key, bool value)
+{
+	//LogInfoW(L"  %ls=%d\n", key, value ? 1 : 0);
+}
+
+bool GetIniBool(Globals& G, const wchar_t* section, const wchar_t* key, bool def, bool* found, bool warn)
+{
+	return GetIniValue<bool>(G, section, key, def, found, warn, ParseBoolValue, LogIniBool);
 }
 
 static UINT64 GetIniHash(Globals& G, const wchar_t* section, const wchar_t* key, UINT64 def, bool* found)
@@ -897,6 +1142,100 @@ static UINT64 GetIniHash(Globals& G, const wchar_t* section, const wchar_t* key,
 	return ret;
 }
 
+template <class T1, class T>
+T GetIniEnumClass(Globals& G, const wchar_t* section, const wchar_t* key, T def, bool* found,
+	struct EnumName_t<const wchar_t*, T>* enum_names)
+{
+	wchar_t val[MAX_PATH];
+	T ret = def;
+	bool tmp_found;
+
+	if (found)
+		*found = false;
+
+	if (GetIniString(G, section, key, 0, val, MAX_PATH)) {
+		ret = lookup_enum_val<const wchar_t*, T>(enum_names, val, def, &tmp_found);
+		if (tmp_found) {
+			if (found)
+				*found = tmp_found;
+			//LogInfo("  %S=%S\n", key, val);
+		}
+		else {
+			//IniWarningW(L"Unknown Enum: %ls=%ls\n - [%ls]\n", key, val, section);
+		}
+	}
+
+	return ret;
+}
+
+template <class T>
+T GetIniEnumClass(Globals& G, const wchar_t* section, const wchar_t* key, T def, bool* found,
+	struct EnumName_t<const wchar_t*, T>* enum_names)
+{
+	return GetIniEnumClass<const wchar_t*, T>(G, section, key, def, found, enum_names);
+}
+
+// char* specialisation of the above. No character limit
+template <class T1, class T>
+T GetIniEnumClass(Globals& G, const wchar_t* section, const wchar_t* key, T def, bool* found,
+	struct EnumName_t<const char*, T>* enum_names)
+{
+	std::string val;
+	T ret = def;
+	bool tmp_found;
+
+	if (found)
+		*found = false;
+
+	if (GetIniString(G, section, key, 0, &val)) {
+		ret = lookup_enum_val<const char*, T>(enum_names, val.c_str(), def, &tmp_found);
+		if (tmp_found) {
+			if (found)
+				*found = tmp_found;
+			//LogInfo("  %S=%s\n", key, val.c_str());
+		}
+		else {
+			//IniWarningW(L"Unknown Enum: %ls=%S\n - [%ls]\n", key, val.c_str(), section);
+		}
+	}
+
+	return ret;
+}
+
+enum class TransitionType {
+	INVALID = -1,
+	LINEAR,
+	COSINE,
+};
+static EnumName_t<const char*, TransitionType> TransitionTypeNames[] = {
+	{"linear", TransitionType::LINEAR},
+	{"cosine", TransitionType::COSINE},
+	{NULL, TransitionType::INVALID} // End of list marker
+};
+
+enum class MarkingMode {
+	SKIP,
+	ORIGINAL,
+	PINK,
+	MONO,
+
+	INVALID, // Must be last - used for next_marking_mode
+};
+static EnumName_t<const wchar_t*, MarkingMode> MarkingModeNames[] = {
+	{L"skip", MarkingMode::SKIP},
+	{L"mono", MarkingMode::MONO},
+	{L"original", MarkingMode::ORIGINAL},
+	{L"pink", MarkingMode::PINK},
+	{NULL, MarkingMode::INVALID} // End of list marker
+};
+
+// Explicit template expansion is necessary to generate these functions for
+// the compiler to generate them so they can be used from other source files:
+template TransitionType GetIniEnumClass<const char*, TransitionType>(Globals& G, const wchar_t* section, const wchar_t* key, TransitionType def, bool* found,
+	struct EnumName_t<const char*, TransitionType>* enum_names);
+template MarkingMode GetIniEnumClass<const wchar_t*, MarkingMode>(Globals& G, const wchar_t* section, const wchar_t* key, MarkingMode def, bool* found,
+	struct EnumName_t<const wchar_t*, MarkingMode>* enum_names);
+
 static void GetUserConfigPath(Globals& G, const wchar_t* migoto_path)
 {
 	std::string tmp;
@@ -914,14 +1253,13 @@ static void ParseIncludedIniFiles(Globals& G, const std::wstring& base_path)
 {
 	IniSections include_sections;
 	IniSections::iterator lower, upper, i;
-	const wchar_t* section_id;
+	const std::wstring* section_id;
 	IniSectionVector* section = NULL;
 	IniSectionVector::iterator entry;
 	std::wstring* key, * val;
 	std::unordered_set<std::wstring> seen;
 	std::wstring namespace_path, rel_path, ini_path;
 	std::vector<pcre2_code*> exclude;
-	DWORD attrib;
 
 	wchar_t migoto_path[MAX_PATH] = {};
 	wcsncpy_s(migoto_path, MAX_PATH, base_path.c_str(), _TRUNCATE);
@@ -939,48 +1277,76 @@ static void ParseIncludedIniFiles(Globals& G, const std::wstring& base_path)
 		G.ini_sections.erase(lower, upper);
 
 		for (i = include_sections.begin(); i != include_sections.end(); i++) {
-			section_id = i->first.c_str();
-			//printf("[%S]\n", section_id);
+			section_id = &i->first;
+			//LogInfo("[%S]\n", section_id->c_str());
 
-			_get_namespaced_section_path(&include_sections, i->first.c_str(), &namespace_path);
+			_get_namespaced_section_path(&include_sections, section_id->c_str(), &namespace_path);
 
-			_GetIniSection(&include_sections, &section, section_id);
+			_GetIniSection(&include_sections, &section, section_id->c_str());
+
 			for (entry = section->begin(); entry < section->end(); entry++) {
 				key = &entry->first;
 				val = &entry->second;
+
 				//printf("  %S=%S\n", key->c_str(), val->c_str());
 
 				rel_path = namespace_path + *val;
 
 				if (seen.count(rel_path)) {
-					//wprintf(L"[WARNING] File included multiple times: %ls - [%ls]\n", rel_path.c_str(), section_id);
+					//wprintf(L"[WARNING] File included multiple times: %ls - [%ls]\n", rel_path.c_str(), section_id->c_str());
 					continue;
 				}
+
 				seen.insert(rel_path);
 
-				if (!wcscmp(key->c_str(), L"include")) {
-					ini_path = std::wstring(migoto_path) + rel_path;
-					ParseNamespacedIniFile(G, ini_path.c_str(), &rel_path);
+				switch (key->size())
+				{
+				case 7: // include
+					if (!wcscmp(key->c_str(), L"include")) {
+						ini_path = std::wstring(migoto_path) + rel_path;
+						ParseNamespacedIniFile(G, ini_path.c_str(), &rel_path);
+						continue;
+					}
+					break;
+
+				case 11: // user_config
+					if (!wcscmp(key->c_str(), L"user_config")) {
+						// Handled below
+						continue;
+					}
+					break;
+
+				case 17: // include_recursive / exclude_recursive
+					if (key->c_str()[0] == L'i') {
+						if (!wcscmp(key->c_str(), L"include_recursive")) {
+							ParseIniFilesRecursive(G, migoto_path, rel_path, exclude);
+							continue;
+						}
+					}
+					else if (key->c_str()[0] == L'e') {
+						if (!wcscmp(key->c_str(), L"exclude_recursive")) {
+							// Handled above
+							continue;
+						}
+					}
+					break;
 				}
-				else if (!wcscmp(key->c_str(), L"include_recursive")) {
-					ParseIniFilesRecursive(G, migoto_path, rel_path, exclude);
-				}
-				else if (!wcscmp(key->c_str(), L"exclude_recursive")) {
-				}
-				else if (!wcscmp(key->c_str(), L"user_config")) {
-				}
-				else {
-					//wprintf(L"[WARNING] Unrecognised entry [Include] sections: %ls=%ls - [%ls] @ [%ls]\n", key->c_str(), val->c_str(), section_id, namespace_path.c_str());
-				}
+
+				/*wprintf(L"Unrecognised entry: %ls=%ls\n - [%ls] @ [%ls]\n",
+					key->c_str(), val->c_str(), section_id->c_str(), namespace_path.c_str());*/
 			}
 		}
 	} while (!include_sections.empty());
 
 	free_globbing_vector(exclude);
+}
 
-	attrib = GetFileAttributes(G.user_config.c_str());
-	if (attrib != INVALID_FILE_ATTRIBUTES)
-		ParseNamespacedIniFile(G, G.user_config.c_str(), &G.user_config);
+static void ParsePersistentSettings(Globals& G)
+{
+	DWORD attrib = GetFileAttributes(G.user_config.c_str());
+	if (attrib == INVALID_FILE_ATTRIBUTES)
+		return;
+	ParseNamespacedIniFile(G, G.user_config.c_str(), &G.user_config);
 }
 
 static CustomResource* ParseResourceSection(Globals& G, const wchar_t* section_name, const wchar_t* resource_id_suffix)
@@ -1037,6 +1403,7 @@ static CustomResource* ParseResourceSection(Globals& G, const wchar_t* section_n
 	//	}
 	//}
 
+	//custom_resource->override_color_space = GetIniEnumClass(section_name, L"color_space", CustomColorSpace::DEFAULT, NULL, CustomColorSpaceNames);
 	//custom_resource->override_width = GetIniInt(section_name, L"width", -1, NULL);
 	//custom_resource->override_height = GetIniInt(section_name, L"height", -1, NULL);
 	//custom_resource->override_depth = GetIniInt(section_name, L"depth", -1, NULL);
@@ -1067,43 +1434,62 @@ static CustomResource* ParseResourceSection(Globals& G, const wchar_t* section_n
 
 static CustomResourcePool* ParseResourcePoolSection(Globals& G, const wchar_t* section_name)
 {
-	int pool_size = GetIniInt(G, section_name, L"pool_size", 0, NULL);
+	int pool_size = GetIniInt(G, section_name, L"pool_size", 1, NULL);
 
-	if (pool_size <= 0) {
+	if (pool_size < 1)
 		return nullptr;
-	}
 
 	std::wstring pool_id = section_name;
 	std::transform(pool_id.begin(), pool_id.end(), pool_id.begin(), ::towlower);
 
-	CustomResourcePool* custom_resource_pool = &G.customResourcePools[pool_id];
+	CustomResourcePool* pool = &G.customResourcePools[pool_id];
 
-	custom_resource_pool->name = pool_id;
-	/*custom_resource_pool->resource_template = ParseResourceSection(G, section_name, L"template");
+	pool->name = pool_id;
 	
-	custom_resource_pool->resource_template->pool = custom_resource_pool;
-	custom_resource_pool->resource_template->pool_index = -1;
+	pool->index_type = GetIniEnumClass(G, section_name, L"pool_index_type", PoolIndexType::RING, NULL, PoolIndexTypeNames);
+	/*pool->lazy_initialization = GetIniBool(section_name, L"pool_lazy_initialization", true, NULL);
+	pool->element_type_switch_reset = GetIniBool(section_name, L"pool_element_type_switch_reset", true, NULL);
+	pool->allocate_slot_on_missing = GetIniBool(section_name, L"pool_allocate_slot_on_missing", false, NULL);
 
-	custom_resource_pool->resources.resize(pool_size, nullptr);
-	custom_resource_pool->lazy_initialization = GetIniBool(section_name, L"pool_lazy_init", 1, NULL);
-	custom_resource_pool->index_type = GetIniEnumClass(section_name, L"pool_index_type", PoolIndexType::RING, NULL, PoolIndexTypeNames);
+	int expiration_timeout_frames = GetIniInt(section_name, L"pool_expiration_timeout_frames", -1, NULL);
+	if (expiration_timeout_frames >= 0)
+		pool->expiration_timeout_frames = (unsigned)expiration_timeout_frames;
+	pool->reset_expired_elements = GetIniBool(section_name, L"pool_expiration_reset_elements", true, NULL);
+	pool->read_refreshes_expiration = GetIniBool(section_name, L"pool_expiration_refresh_on_read", false, NULL);
 
-	if (custom_resource_pool->index_type == PoolIndexType::FIFO) {
-		custom_resource_pool->fifo_index_table.resize(pool_size, FLT_MAX);
-		custom_resource_pool->last_fifo_index = pool_size - 1;
+	int spatial_radius = GetIniInt(section_name, L"pool_spatial_radius", 1, NULL);
+	if (spatial_radius < 1) {
+		IniWarningW(L"Specified spatial radius \"%d\" is below minimum \"1\".\n - [%ls]\n", spatial_radius, pool->name.c_str());
+		spatial_radius = 1;
+	}
+	pool->spatial_radius = spatial_radius;
+
+	pool->resource_template = ParseResourceSection(section_name, L"template");
+
+	pool->resource_template->pool = pool;
+	pool->resource_template->pool_index = -1;
+
+	bool persist_variables = GetIniBool(section_name, L"pool_persist_variables", false, NULL);
+	if (persist_variables && pool->index_type != PoolIndexType::RING) {
+		persist_variables = false;
+		IniWarningW(L"Pool variables persistence is not supported for \"%ls\" index type (\"ring\" index only feature).\n - [%ls]\n",
+			lookup_enum_name(PoolIndexTypeNames, pool->index_type), pool->name.c_str());
 	}
 
-	if (!custom_resource_pool->lazy_initialization) {
-		for (int pool_index = 0; pool_index < pool_size; ++pool_index) {
-			custom_resource_pool->InitializeResource(pool_index);
-		}
-	}*/
+	pool->variable_template = std::make_unique<CommandListVariable>(
+		pool_id + L"_template",
+		GetIniFloat(section_name, L"pool_variable_default_value", 0, NULL),
+		persist_variables ? VariableFlags::PERSIST : VariableFlags::NONE
+	);
 
-	return custom_resource_pool;
+	pool->Initialize(pool_size);*/
+
+	return pool;
 }
 
 static void ParseResourceSections(Globals& G)
 {
+	//ClearDeferredBindFlags();
 	G.customResourcePools.clear();
 	G.customResources.clear();
 
@@ -1141,21 +1527,23 @@ static bool ParseCommandListLine(Globals& G, const wchar_t* ini_section,
 	// We only care about FlowControl & VariableAssignment
 	// and GeneralCommand to check "run" commandlist
 
-	if (ParseCommandListGeneralCommands(G, lhs, rhs, ini_namespace, full_path, line_index, raw_line->c_str()))
+	if (ParseCommandListVariableAssignment(G, ini_section, lhs, rhs, raw_line, command_list, pre_command_list, post_command_list, ini_namespace))
+		return true;
+
+	if (raw_line && !explicit_command_list &&
+		ParseCommandListFlowControl(G, ini_section, raw_line, pre_command_list, post_command_list, ini_namespace, full_path, line_index))
+		return true;
+
+	if (ParseCommandListGeneralCommands(G, lhs, rhs, ini_namespace, full_path, line_index, raw_line))
 		return true;
 
 	/*if (ParseCommandListIniParamOverride(ini_section, lhs, rhs, command_list, ini_namespace))
 		return true;*/
 
-	if (ParseCommandListVariableAssignment(G, ini_section, lhs, rhs, raw_line, command_list, pre_command_list, post_command_list, ini_namespace))
-		return true;
-
-	/*if (ParseCommandListResourceCopyDirective(ini_section, lhs, rhs, command_list, ini_namespace))
+	/*if (ParseCommandListResourceCopyTargetDirective(ini_section, lhs, rhs, command_list, ini_namespace))
 		return true;*/
 
-	if (raw_line && !explicit_command_list &&
-		ParseCommandListFlowControl(G, ini_section, raw_line, pre_command_list, post_command_list, ini_namespace, full_path, line_index))
-		return true;
+	
 
 	return false;
 }
@@ -1240,19 +1628,8 @@ static void ParseCommandList(Globals& G, const wchar_t* id,
 			continue;
 		}
 
-		if (entry->ini_namespace == G.user_config && !G.user_config.empty()) {
-			if (!G.user_config_dirty) {
-				/*printf(
-					"NOTICE: Unknown user settings will be removed from d3dx_user.ini\n"
-					" This is normal if you recently removed/changed any mods\n"
-					" Press ? to update the config now, or ? to reset all settings to default\n"
-					" The first unrecognised entry was: \"%S\"\n",
-					raw_line->c_str());*/
-				G.user_config_dirty |= 2;
-			}
-			//wprintf(L"[WARNING] Unrecognised entry in %ls: %ls\n", G->user_config.c_str(), raw_line->c_str());
+		if (entry->ini_namespace == G.user_config && !G.user_config.empty())
 			continue;
-		}
 
 		//wprintf(L"[WARNING] Ignored entry CommandList sections: %ls - [%ls] @ [%ls]\n", raw_line->c_str(), id, entry->ini_namespace.c_str());
 	}
@@ -1266,74 +1643,98 @@ static void ParseCommandList(Globals& G, const wchar_t* id,
 		post_command_list->scope = NULL;
 }
 
+CommandListVariable* RegisterGlobalVariable(Globals& G, std::wstring& name, float* fval, VariableFlags flags)
+{
+	std::pair<CommandListVariables::iterator, bool> inserted = G.command_list_globals.emplace(name, CommandListVariable{ name, *fval, flags });
+	if (!inserted.second) {
+		return nullptr;
+	}
+
+	/*if (flags & VariableFlags::PERSIST)
+		persistent_variables.emplace_back(&inserted.first->second);
+
+	if (!fval)
+		LogInfo("  global %S\n", name.c_str());
+	else
+		LogInfo("  global %S=%f\n", name.c_str(), *fval);*/
+
+	return &inserted.first->second;
+}
+
 static void ParseConstantsSection(Globals& G)
 {
 	VariableFlags flags;
 	IniSectionVector* section = NULL;
-	IniSectionVector::iterator entry, next;
 	std::wstring* key, * val, name;
 	const wchar_t* name_pos;
 	const std::wstring* ini_namespace;
-	std::pair<CommandListVariables::iterator, bool> inserted;
-	float fval;
-	int len;
 
 	//LogInfo("[Constants]\n");
 
 	G.command_list_globals.clear();
 	//persistent_variables.clear();
 	GetIniSection(G, &section, L"Constants");
-	for (next = section->begin(), entry = next; entry < section->end(); entry = next) {
-		next++;
-		key = &entry->first;
-		val = &entry->second;
-		ini_namespace = &entry->ini_namespace;
+	size_t write_index = 0;
+
+	for (size_t read_index = 0; read_index < section->size(); ++read_index)
+	{
+		IniLine& entry = (*section)[read_index];
+
+		key = &entry.first;
+		val = &entry.second;
+		ini_namespace = &entry.ini_namespace;
 
 		if (!key->empty())
 			name = *key;
 		else
-			name = entry->raw_line;
+			name = entry.raw_line;
 
-		std::transform(name.begin(), name.end(), name.begin(), ::towlower);
+		for (wchar_t& c : name)
+			c = ascii_tolower(c);
 
 		flags = parse_enum_option_string_prefix<const wchar_t*, VariableFlags>
 			(VariableFlagNames, name.c_str(), &name_pos);
+
 		if (!(flags & VariableFlags::GLOBAL))
+		{
+			// Keep Non-Global Entries in their Original Order.
+			// Move instead of Copy so the WStrings are Transferred
+			// without Allocating/Copying their Contents.
+			if (write_index != read_index)
+				(*section)[write_index] = std::move(entry);
+
+			++write_index;
 			continue;
+		}
+
 		name = name_pos;
 
 		if (!valid_variable_name(name)) {
-			//wprintf(L"[WARNING] Illegal global variable name: \"%ls\" - [Constants] @ [%ls]\n", name.c_str(), entry->ini_namespace.c_str());
+			//wprintf(L"Illegal global variable name: \"%ls\"\n - [Constants] @ [%ls]\n", name.c_str(), ini_namespace->c_str());
 			continue;
 		}
 
 		if (!ini_namespace->empty())
 			name = get_namespaced_var_name_lower(name, ini_namespace);
 
-		fval = 0.0f;
-		if (!val->empty()) {
-			if (swscanf_s(val->c_str(), L"%f%n", &fval, &len) != 1 || len != val->length()) {
-				//wprintf(L"[WARNING] Floating point parse error: %ls=%ls - [Constants] @ [%ls]\n", key->c_str(), val->c_str(), entry->ini_namespace.c_str());
+		float fval = 0.0f;
+		if (!val->empty())
+		{
+			if (!ParseFloatValue(G, L"Constants", key->c_str(), *val, fval, true, ini_namespace))
 				continue;
-			}
 		}
 
-		inserted = G.command_list_globals.emplace(name, CommandListVariable{ name, fval, flags });
-		if (!inserted.second) {
-			//wprintf(L"[WARNING] Redeclaration of %ls - [Constants] @ [%ls]\n", name.c_str(), entry->ini_namespace.c_str());
+		if (!RegisterGlobalVariable(G, name, &fval, flags)) {
+			//wprintf(L"Redeclaration of %ls\n - [Constants] @ [%ls]\n", name.c_str(), ini_namespace->c_str());
 			continue;
 		}
 
-		/*if (flags & VariableFlags::PERSIST)
-			persistent_variables.emplace_back(&inserted.first->second);*/
-
-		/*if (val->empty())
-			LogInfo("  global %S\n", name.c_str());
-		else
-			LogInfo("  global %S=%f\n", name.c_str(), fval);*/
-
-		next = section->erase(entry);
+		// Global Entries are Intentionally not Copied into the Compacted
+		// Vector, so they will not be Processed during the Second Pass.
 	}
+
+	// Remove the Trailing Entries left behind by the Compacting Pass.
+	section->erase(section->begin() + write_index, section->end());
 }
 
 wchar_t* ShaderOverrideIniKeys[] = {
@@ -1602,6 +2003,7 @@ static void ParseTextureOverrideSections(Globals& G)
 
 	G.mTextureOverrideMap.clear();
 	G.mFuzzyTextureOverrides.clear();
+	//InvalidateTextureOverrideCandidates();
 
 	lower = G.ini_sections.lower_bound(std::wstring(L"TextureOverride"));
 	upper = prefix_upper_bound(G.ini_sections, std::wstring(L"TextureOverride"));
@@ -1834,6 +2236,7 @@ void LoadConfigFile(Globals& G, const std::wstring& ini_file, const std::wstring
 
 	ParseIncludedIniFiles(G, base_path);
 
+	ParsePersistentSettings(G);
 
 	G.registered_command_lists.clear();
 
@@ -1886,6 +2289,8 @@ void LoadConfigFile(Globals& G, const std::wstring& ini_file, const std::wstring
 	G.post_clear_uav_float_command_list.clear();
 	ParseCommandList(G, L"ClearUnorderedAccessViewFloat", &G.clear_uav_float_command_list, &G.post_clear_uav_float_command_list, NULL);
 
+	//PropagateDeferredBindFlags();
+	// 
 	// Look for:
 	//"if" missing "endif"
 	//"else" "elif" "else if" missing "if"

@@ -1,6 +1,5 @@
 //Sorry the code is messy.
 import 'dart:async';
-import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'dart:isolate';
 import 'package:auto_updater/auto_updater.dart';
@@ -12,6 +11,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:no_reload_mod_manager/utils/check_admin_privillege.dart';
 import 'package:no_reload_mod_manager/utils/constant_var.dart';
 import 'package:no_reload_mod_manager/utils/custom_menu_item.dart';
+import 'package:no_reload_mod_manager/utils/external_editors.dart';
 import 'package:no_reload_mod_manager/utils/get_cloud_data.dart';
 import 'package:no_reload_mod_manager/utils/hotkey_handler.dart';
 import 'package:no_reload_mod_manager/utils/ini_handler_bridge.dart';
@@ -47,7 +47,8 @@ import 'package:xinput_gamepad/xinput_gamepad.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 void main(List<String> args) async {
-  prewarmDll();
+  unawaited(prewarmDll());
+  findExternalCodeEditors();
   WidgetsFlutterBinding.ensureInitialized();
   bool successLoadPref = await SharedPrefUtils().tryInit();
   await EasyLocalization.ensureInitialized();
@@ -1578,7 +1579,7 @@ class _MainViewState extends ConsumerState<MainView>
             hitTestBehavior: HitTestBehavior.translucent,
             onEnter: (_) {
               setState(() {
-                showRandomTips = ref.watch(showVerina) ? false : true;
+                showRandomTips = true;
               });
             },
             onExit: (_) {
@@ -1726,7 +1727,7 @@ void changeWindowTitleName(String gameName, {WidgetRef? ref}) {
   if (gameName.isNotEmpty) {
     final lastOpened = SharedPrefUtils().getLastOpened();
     final daysDifference = DateTime.now().difference(lastOpened).inDays;
-    if (daysDifference >= 7) {
+    if (daysDifference >= 10) {
       if (ref != null) {
         ref.read(showVerina.notifier).state = true;
       }
@@ -1969,11 +1970,7 @@ String getRandomTips(String previousTips) {
   return available.first;
 }
 
-void prewarmDll() {
+Future<void> prewarmDll() async {
   print("PREWARM");
-  unawaited(
-    Isolate.run(() {
-      ffi.DynamicLibrary.open('xxmi_lib_ini_handler.dll');
-    }),
-  );
+  await Isolate.run(() => getErroredLines('', '', {}));
 }

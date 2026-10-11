@@ -504,7 +504,7 @@ class _SupportAndStatsDialogState extends ConsumerState<SupportAndStatsDialog> {
       _isYes = isYes;
     });
 
-    _closeTimer = Timer(const Duration(seconds: 3), () {
+    _closeTimer = Timer(const Duration(seconds: 1), () {
       if (mounted) {
         Navigator.of(context).pop();
         ref.read(alertDialogShownProvider.notifier).state = false;
