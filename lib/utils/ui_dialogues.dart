@@ -445,13 +445,10 @@ class _SupportAndStatsDialogState extends ConsumerState<SupportAndStatsDialog> {
       _modsCount += group.modsInGroup.length - 1;
     }
 
-    String prefPath = p.join(
-      SharedPrefUtils().getUserProfilePath(),
-      r'AppData\Roaming\com.aglg\No Reload Mod Manager',
-    );
-
     DateTime? firstLaunch;
-    final prefDir = Directory(prefPath);
+    final prefDir = Directory(
+      p.dirname(await SharedPrefUtils().getSharedPrefPath()),
+    );
     if (await prefDir.exists()) {
       final ttfFiles =
           await prefDir
@@ -766,9 +763,13 @@ class _OnDropFolderDialogState extends ConsumerState<OnDropModFolderDialog> {
   /// contains a folder named '_MANAGED_' (case-insensitive).
   Future<bool> isParentOfManagedFolder(String dirPath) async {
     try {
-      final dir = Directory(
-        r"\\?\" + dirPath.replaceFirst(r"\\?\", ''),
-      ); // workaround \\?\ for long paths, only for Windows
+      Directory dir;
+
+      if (Platform.isWindows) {
+        dir = Directory(r"\\?\" + dirPath.replaceFirst(r"\\?\", ''));
+      } else {
+        dir = Directory(dirPath);
+      }
 
       if (!await dir.exists()) return false;
 
@@ -1387,11 +1388,13 @@ class _CopyModDialogState extends ConsumerState<CopyModDialog> {
             await unwrapSingleFolderNesting(destDirPath);
           } else {
             try {
-              await Directory(
-                r"\\?\" + destDirPath.replaceFirst(r"\\?\", ''),
-              ).delete(
-                recursive: true,
-              ); // workaround \\?\ for long paths, only for Windows
+              if (Platform.isWindows) {
+                await Directory(
+                  r"\\?\" + destDirPath.replaceFirst(r"\\?\", ''),
+                ).delete(recursive: true);
+              } else {
+                await Directory(destDirPath).delete(recursive: true);
+              }
             } catch (_) {}
             if (extractResult.wrongPassword) {
               throw Exception("Wrong password");
@@ -1475,8 +1478,12 @@ class _CopyModDialogState extends ConsumerState<CopyModDialog> {
   }
 
   Future<void> deleteUnusedFolder(Directory folder) async {
-    // workaround \\?\ for long paths, only for Windows
-    final dir = Directory(r"\\?\" + folder.path.replaceFirst(r"\\?\", ''));
+    Directory dir;
+    if (Platform.isWindows) {
+      dir = Directory(r"\\?\" + folder.path.replaceFirst(r"\\?\", ''));
+    } else {
+      dir = Directory(folder.path);
+    }
     try {
       await dir.delete(recursive: true);
     } catch (_) {}
@@ -1498,13 +1505,16 @@ class _CopyModDialogState extends ConsumerState<CopyModDialog> {
   }
 
   Future<void> copyDirectory(Directory source, Directory destination) async {
-    // workaround \\?\ for long paths, only for Windows
-    final sourceDir = Directory(
-      r"\\?\" + source.path.replaceFirst(r"\\?\", ''),
-    );
-    final destDir = Directory(
-      r"\\?\" + destination.path.replaceFirst(r"\\?\", ''),
-    );
+    final Directory sourceDir;
+    final Directory destDir;
+
+    if (Platform.isWindows) {
+      sourceDir = Directory(r"\\?\" + source.path.replaceFirst(r"\\?\", ''));
+      destDir = Directory(r"\\?\" + destination.path.replaceFirst(r"\\?\", ''));
+    } else {
+      sourceDir = Directory(source.path);
+      destDir = Directory(destination.path);
+    }
     try {
       if (!await destDir.exists()) {
         await destDir.create(recursive: true);
@@ -2116,11 +2126,13 @@ class _ExtractModCasualDialogState
         await unwrapSingleFolderNesting(destDirPath);
       } else {
         try {
-          await Directory(
-            r"\\?\" + destDirPath.replaceFirst(r"\\?\", ''),
-          ).delete(
-            recursive: true,
-          ); // workaround \\?\ for long paths, only for Windows
+          if (Platform.isWindows) {
+            await Directory(
+              r"\\?\" + destDirPath.replaceFirst(r"\\?\", ''),
+            ).delete(recursive: true);
+          } else {
+            await Directory(destDirPath).delete(recursive: true);
+          }
         } catch (_) {}
         if (extractResult.wrongPassword) {
           throw Exception("Wrong password");
@@ -2572,9 +2584,13 @@ class _RemoveModGroupDialogState extends ConsumerState<RemoveModGroupDialog> {
 
     try {
       if (!await Directory(managedPath).exists()) {
-        await Directory(r"\\?\" + managedPath.replaceFirst(r"\\?\", '')).create(
-          recursive: true,
-        ); // workaround \\?\ for long paths, only for Windows
+        if (Platform.isWindows) {
+          await Directory(
+            r"\\?\" + managedPath.replaceFirst(r"\\?\", ''),
+          ).create(recursive: true);
+        } else {
+          await Directory(managedPath).create(recursive: true);
+        }
       }
 
       Directory movedDir = await Directory(
@@ -3003,15 +3019,19 @@ class _SaveModCustomizationsDialogState
         }
 
         for (final relFolderPath in folderPaths) {
-          final mentionedFolder = Directory(
-            r"\\?\" +
-                p
-                    .join(p.dirname(widget.validModsPath), relFolderPath)
-                    .replaceFirst(
-                      r"\\?\",
-                      '',
-                    ), // workaround \\?\ for long paths, only for Windows
-          );
+          final Directory mentionedFolder;
+          if (Platform.isWindows) {
+            mentionedFolder = Directory(
+              r"\\?\" +
+                  p
+                      .join(p.dirname(widget.validModsPath), relFolderPath)
+                      .replaceFirst(r"\\?\", ''),
+            );
+          } else {
+            mentionedFolder = Directory(
+              p.join(p.dirname(widget.validModsPath), relFolderPath),
+            );
+          }
 
           if (!await mentionedFolder.exists()) continue;
 
@@ -3025,7 +3045,9 @@ class _SaveModCustomizationsDialogState
               final (isAscii: ok, result: markedName) = checkAscii(name);
               if (!ok) {
                 potentiallyTriggeringBugPaths.add(
-                  e.path.replaceFirst(r"\\?\", ''),
+                  Platform.isWindows
+                      ? e.path.replaceFirst(r"\\?\", '')
+                      : e.path,
                 );
               }
             }

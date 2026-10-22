@@ -6,9 +6,11 @@ import 'package:no_reload_mod_manager/custom/self_update_dialog.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/services.dart';
+import 'package:no_reload_mod_manager/linux_wine_helper/linux_wine_helper_client.dart';
 import 'package:no_reload_mod_manager/main.dart';
 import 'package:no_reload_mod_manager/utils/constant_var.dart';
 import 'package:no_reload_mod_manager/utils/custom_menu_item.dart';
+import 'package:no_reload_mod_manager/utils/detect_game_wine.dart';
 import 'package:no_reload_mod_manager/utils/languages_name.dart';
 import 'package:no_reload_mod_manager/utils/managedfolder_watcher.dart';
 import 'package:no_reload_mod_manager/utils/mods_dropzone.dart';
@@ -46,7 +48,7 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
   Future<void> _getAppVersion() async {
     final info = await PackageInfo.fromPlatform();
     setState(() {
-      appVersion = "v${info.version}";
+      appVersion = "v${info.version}+${info.buildNumber}";
     });
   }
 
@@ -245,115 +247,9 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
                         color: getAccentColor(ref, alpha: 127),
                         thickness: 1 * sss,
                       ),
-                      Container(height: 10 * sss),
 
-                      Text(
-                        'Group Folder Icon'.tr(),
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 14 * sss,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Container(height: 1 * sss),
-                      Text(
-                        "Optionally show group folder icons within File Explorer."
-                            .tr(),
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(
-                          color: const Color.fromARGB(200, 255, 255, 255),
-                          fontSize: 11 * sss,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-
-                      Container(height: 15 * sss),
-
-                      ElevatedButton(
-                        onPressed: () async {
-                          if (ref.read(validModsPath) == null) return;
-                          ref.read(alertDialogShownProvider.notifier).state =
-                              true;
-                          await showDialog(
-                            barrierDismissible: false,
-                            context: context,
-                            builder:
-                                (context) => GenerateGroupIcoFileDialog(
-                                  validModsPath: ref.read(validModsPath)!,
-                                ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          overlayColor: Colors.white,
-                          backgroundColor: const Color.fromARGB(
-                            127,
-                            255,
-                            255,
-                            255,
-                          ),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8 * sss),
-                          child: Text(
-                            'Generate Group Folder Icon'.tr(),
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              fontSize: 12 * sss,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Container(height: 10 * sss),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            height: 25 * sss,
-                            width: 35 * sss,
-                            child: FittedBox(
-                              fit: BoxFit.fill,
-                              child: Switch(
-                                value: ref.watch(
-                                  isAutoGenerateFolderIconProvider,
-                                ),
-                                onChanged: (value) {
-                                  SharedPrefUtils().setAutoGenerateFolderIcon(
-                                    value,
-                                  );
-                                  ref
-                                      .read(
-                                        isAutoGenerateFolderIconProvider
-                                            .notifier,
-                                      )
-                                      .state = value;
-                                },
-                                activeColor: getAccentColor(ref),
-                                trackOutlineWidth: WidgetStatePropertyAll(0),
-                                trackOutlineColor: WidgetStatePropertyAll(
-                                  Colors.transparent,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Container(width: 15 * sss),
-                          Text(
-                            'Auto generate folder icon when changing group icon'
-                                .tr(),
-                            style: GoogleFonts.poppins(
-                              color: const Color.fromARGB(255, 255, 255, 255),
-                              fontSize: 12 * sss,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(height: 15 * sss),
-                      Divider(
-                        color: getAccentColor(ref, alpha: 127),
-                        thickness: 1 * sss,
-                      ),
+                      if (Platform.isWindows)
+                        ...(groupFolderIconSection(context, ref, sss)),
                       Container(height: 10 * sss),
 
                       Text(
@@ -429,7 +325,120 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
                           max: 255,
                         ),
                       ),
+                      Container(height: 10 * sss),
+                      Text(
+                        'Window Border Opacity'.tr(),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 14 * sss,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 4.0 * sss,
+                          thumbShape: RoundSliderThumbShape(
+                            enabledThumbRadius: 9.0 * sss,
+                          ),
+                        ),
+                        child: Slider(
+                          activeColor: getAccentColor(ref),
+                          value: ref.watch(borderOpacityProvider).toDouble(),
+                          onChangeEnd: (value) {
+                            SharedPrefUtils().setBorderOpacity(value.round());
+                          },
+                          onChanged: (value) {
+                            ref.read(borderOpacityProvider.notifier).state =
+                                value.round();
+                          },
+                          min: 0,
+                          max: 255,
+                        ),
+                      ),
+                      Container(height: 10 * sss),
+                      Text(
+                        'Window Corner Radius'.tr(),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 14 * sss,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 4.0 * sss,
+                          thumbShape: RoundSliderThumbShape(
+                            enabledThumbRadius: 9.0 * sss,
+                          ),
+                        ),
+                        child: Slider(
+                          activeColor: getAccentColor(ref),
+                          value: ref.watch(windowCornerRadiusProvider),
+                          onChangeEnd: (value) {
+                            SharedPrefUtils().setWindowCornerRadius(value);
+                          },
+                          onChanged: (value) {
+                            ref
+                                .read(windowCornerRadiusProvider.notifier)
+                                .state = value;
+                          },
+                          min: 0,
+                          max: 50,
+                        ),
+                      ),
 
+                      // Container(height: 10 * sss),
+                      // Text(
+                      //   'Accent Color'.tr(),
+                      //   style: GoogleFonts.poppins(
+                      //     color: Colors.white,
+                      //     fontSize: 14 * sss,
+                      //     fontWeight: FontWeight.w600,
+                      //   ),
+                      // ),
+                      // SizedBox(height: 10 * sss),
+                      // Row(
+                      //   mainAxisAlignment: MainAxisAlignment.center,
+                      //   children: [
+                      //     SizedBox(
+                      //       width: 80 * sss,
+                      //       child: TextField(
+                      //         textAlign: TextAlign.center,
+                      //         // controller: textSectionController,
+                      //         // onChanged: widget.onSectionChanged,
+                      //         decoration: InputDecoration(
+                      //           isDense: true,
+                      //           disabledBorder: InputBorder.none,
+                      //           enabledBorder: InputBorder.none,
+                      //           border: UnderlineInputBorder(),
+                      //           hintText: '#2195f3',
+                      //           hintStyle: GoogleFonts.poppins(
+                      //             fontWeight: FontWeight.w500,
+                      //             color: const Color.fromARGB(
+                      //               60,
+                      //               255,
+                      //               255,
+                      //               255,
+                      //             ),
+                      //             fontSize: 13 * sss,
+                      //           ),
+                      //         ),
+                      //         maxLines: 1,
+                      //         keyboardType: TextInputType.none,
+                      //         style: GoogleFonts.poppins(
+                      //           fontWeight: FontWeight.w500,
+                      //           color: Colors.white,
+                      //           fontSize: 13 * sss,
+                      //         ),
+                      //         inputFormatters: [
+                      //           FilteringTextInputFormatter.deny(
+                      //             RegExp(r'[\n\r\u0085\u2028\u2029]'),
+                      //           ),
+                      //         ],
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
                       Container(height: 15 * sss),
                       Divider(
                         color: getAccentColor(ref, alpha: 127),
@@ -1231,7 +1240,7 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
                             child: Column(
                               children: [
                                 Text(
-                                  "Stats".tr(),
+                                  "Stats",
                                   style: GoogleFonts.poppins(
                                     color: Colors.white,
                                     fontSize: 12 * sss,
@@ -1481,17 +1490,29 @@ class _GameSettingsState extends ConsumerState<GameSettings> {
   @override
   void initState() {
     super.initState();
+    final targetGame = ref.read(targetGameProvider);
+    loadTextFieldModsPath(targetGame);
+    loadTextFieldTargetProcess(targetGame);
 
     ref.listenManual(targetGameProvider, (previous, next) {
       loadTextFieldModsPath(next);
       loadTextFieldTargetProcess(next);
     });
+
+    wineHelper.onStopped =
+        _helperStoppedListener; // game closed or helper crashed
   }
 
   @override
   void dispose() {
     _targetProcessTextFieldController.dispose();
     _modsPathTextFieldController.dispose();
+
+    // Only clear it if it is still ours (a newer page may have replaced it)
+    if (wineHelper.onStopped == _helperStoppedListener) {
+      wineHelper.onStopped = null;
+    }
+
     super.dispose();
   }
 
@@ -1684,13 +1705,15 @@ class _GameSettingsState extends ConsumerState<GameSettings> {
     });
 
     String initialDir =
-        await Directory(_modsPathTextFieldController.text).exists() == true &&
+        await Directory(_modsPathTextFieldController.text).exists() &&
                 _modsPathTextFieldController.text.trim() != ''
             ? _modsPathTextFieldController.text
-            : p.join(
-              SharedPrefUtils().getUserProfilePath(),
+            : Platform.isWindows
+            ? p.join(
+              SharedPrefUtils().getUserProfilePathWindows(),
               r'AppData\Roaming',
-            );
+            )
+            : '';
     try {
       String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
         lockParentWindow: true,
@@ -1749,6 +1772,57 @@ class _GameSettingsState extends ConsumerState<GameSettings> {
           ),
     );
   }
+
+  //WINE HELPER
+
+  WineHelperState _helperState = WineHelperState.notConnected;
+  String _helperMessage = ''; // error text when failed
+
+  late final VoidCallback _helperStoppedListener =
+      () => _setHelperState(WineHelperState.notConnected);
+
+  void _setHelperState(WineHelperState state, [String message = '']) {
+    if (!mounted) return;
+    setState(() {
+      _helperState = state;
+      _helperMessage = message;
+    });
+  }
+
+  Future<void> _onConnectHelperClicked() async {
+    _setHelperState(WineHelperState.connecting);
+
+    final game = await WineGame.find(_targetProcessTextFieldController.text);
+    if (game == null) {
+      _setHelperState(WineHelperState.failed, 'Start the game first'.tr());
+      return;
+    }
+
+    try {
+      // Same prefix already running: instant. Other game's prefix: switches helper.
+      await wineHelper.start(game);
+      _setHelperState(WineHelperState.connected);
+    } catch (error) {
+      _setHelperState(WineHelperState.failed, error.toString());
+    }
+  }
+
+  String _helperStatusText() => switch (_helperState) {
+    WineHelperState.notConnected =>
+      'Open the target game and connect to it to use the mod manager on Linux'
+          .tr(),
+    WineHelperState.connecting => 'Connecting...'.tr(),
+    WineHelperState.connected => 'Connected'.tr(),
+    WineHelperState.failed => _helperMessage,
+  };
+
+  Color _helperStatusColor() => switch (_helperState) {
+    WineHelperState.connected => Colors.green,
+    WineHelperState.failed => Colors.red,
+    WineHelperState.notConnected => Colors.yellow,
+    _ => const Color.fromARGB(200, 255, 255, 255),
+  };
+  //WINE HELPER
 
   @override
   Widget build(BuildContext context) {
@@ -2022,7 +2096,69 @@ class _GameSettingsState extends ConsumerState<GameSettings> {
               fontWeight: FontWeight.w500,
             ),
           ),
+          //
+          //
+          //WINE HELPER
+          if (Platform.isLinux) ...[
+            Container(height: 15 * sss),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed:
+                        _helperState == WineHelperState.connecting
+                            ? null
+                            : _onConnectHelperClicked,
+                    style: ElevatedButton.styleFrom(
+                      overlayColor: Colors.white,
+                      backgroundColor: const Color.fromARGB(127, 255, 255, 255),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12 * sss),
+                      child: Text(
+                        'Connect to Wine Helper'.tr(),
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12 * sss,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Container(height: 2 * sss),
+            Text(
+              _helperStatusText(),
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                color: _helperStatusColor(),
+                fontSize: 11 * sss,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
 
+            Container(height: 8 * sss),
+            Divider(
+              color: const Color.fromARGB(127, 33, 149, 243),
+              thickness: 1 * sss,
+            ),
+            Container(height: 8 * sss),
+            Text(
+              "If the hotkey (Alt+W by default) does nothing in-game".tr(),
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                color: Colors.yellow,
+                fontSize: 11 * sss,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+          //WINE HELPER
+          //
+          //
           Container(height: 8 * sss),
           Divider(
             color: const Color.fromARGB(127, 33, 149, 243),
@@ -2035,8 +2171,23 @@ class _GameSettingsState extends ConsumerState<GameSettings> {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     _onSaveModsCustomizationsClicked();
+
+                    final game = await WineGame.find('launcher_main.exe');
+                    if (game != null) {
+                      print('Prefix: ${game.prefixPath}');
+                      print(
+                        game.isProton
+                            ? 'Proton: ${game.protonFolder}'
+                            : 'Wine: ${game.wineBinary}',
+                      );
+
+                      // final helperPid = await game.runExeOnce(
+                      //   '/path/to/nrmm_helper.exe',
+                      // );
+                      // print('Helper pid: $helperPid');
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     overlayColor: Colors.white,
@@ -2114,4 +2265,101 @@ class _GameSettingsState extends ConsumerState<GameSettings> {
       ),
     );
   }
+}
+
+List<Widget> groupFolderIconSection(
+  BuildContext context,
+  WidgetRef ref,
+  double sss,
+) {
+  return [
+    Container(height: 10 * sss),
+
+    Text(
+      'Group Folder Icon'.tr(),
+      style: GoogleFonts.poppins(
+        color: Colors.white,
+        fontSize: 14 * sss,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    Container(height: 1 * sss),
+    Text(
+      "Optionally show group folder icons within File Explorer.".tr(),
+      textAlign: TextAlign.center,
+      style: GoogleFonts.poppins(
+        color: const Color.fromARGB(200, 255, 255, 255),
+        fontSize: 11 * sss,
+        fontWeight: FontWeight.w500,
+      ),
+    ),
+
+    Container(height: 15 * sss),
+
+    ElevatedButton(
+      onPressed: () async {
+        if (ref.read(validModsPath) == null) return;
+        ref.read(alertDialogShownProvider.notifier).state = true;
+        await showDialog(
+          barrierDismissible: false,
+          context: context,
+          builder:
+              (context) => GenerateGroupIcoFileDialog(
+                validModsPath: ref.read(validModsPath)!,
+              ),
+        );
+      },
+      style: ElevatedButton.styleFrom(
+        overlayColor: Colors.white,
+        backgroundColor: const Color.fromARGB(127, 255, 255, 255),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 8 * sss),
+        child: Text(
+          'Generate Group Folder Icon'.tr(),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.poppins(
+            fontSize: 12 * sss,
+            fontWeight: FontWeight.w500,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    ),
+    Container(height: 10 * sss),
+    Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          height: 25 * sss,
+          width: 35 * sss,
+          child: FittedBox(
+            fit: BoxFit.fill,
+            child: Switch(
+              value: ref.watch(isAutoGenerateFolderIconProvider),
+              onChanged: (value) {
+                SharedPrefUtils().setAutoGenerateFolderIcon(value);
+                ref.read(isAutoGenerateFolderIconProvider.notifier).state =
+                    value;
+              },
+              activeColor: getAccentColor(ref),
+              trackOutlineWidth: WidgetStatePropertyAll(0),
+              trackOutlineColor: WidgetStatePropertyAll(Colors.transparent),
+            ),
+          ),
+        ),
+        Container(width: 15 * sss),
+        Text(
+          'Auto generate folder icon when changing group icon'.tr(),
+          style: GoogleFonts.poppins(
+            color: const Color.fromARGB(255, 255, 255, 255),
+            fontSize: 12 * sss,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    ),
+    Container(height: 15 * sss),
+    Divider(color: getAccentColor(ref, alpha: 127), thickness: 1 * sss),
+  ];
 }

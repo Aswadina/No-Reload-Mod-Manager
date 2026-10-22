@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:no_reload_mod_manager/utils/constant_var.dart';
 import 'package:no_reload_mod_manager/utils/mods_path_validator.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SharedPrefUtils {
@@ -13,13 +14,19 @@ class SharedPrefUtils {
 
   SharedPrefUtils._internal();
 
-  String getSharedPrefPath() {
-    String prefPath = p.join(
-      getUserProfilePath(),
-      r'AppData\Roaming\com.aglg\No Reload Mod Manager\shared_preferences.json',
-    );
-
-    return prefPath;
+  Future<String> getSharedPrefPath() async {
+    if (Platform.isWindows) {
+      return p.join(
+        getUserProfilePathWindows(),
+        r'AppData\Roaming\com.aglg\No Reload Mod Manager\shared_preferences.json',
+      );
+    } else if (Platform.isLinux) {
+      // Same folder the shared_preferences plugin writes to, normal build or AppImage
+      final supportFolder = await getApplicationSupportDirectory();
+      return p.join(supportFolder.path, 'shared_preferences.json');
+    } else {
+      return '';
+    }
   }
 
   Future<bool> tryInit() async {
@@ -27,7 +34,7 @@ class SharedPrefUtils {
       _prefs ??= await SharedPreferences.getInstance();
       return true;
     } catch (_) {
-      await File(getSharedPrefPath()).delete();
+      await File(await getSharedPrefPath()).delete();
       _prefs ??= await SharedPreferences.getInstance();
       return false;
     }
@@ -173,7 +180,7 @@ class SharedPrefUtils {
   String getWuwaModsPath() {
     String? result = _prefs?.getString(keyModsPathWuwa);
     String defaultPath = p.join(
-      getUserProfilePath(),
+      getUserProfilePathWindows(),
       r'AppData\Roaming\XXMI Launcher\WWMI\Mods',
     );
     if (result == null) {
@@ -193,7 +200,7 @@ class SharedPrefUtils {
   String getGenshinModsPath() {
     String? result = _prefs?.getString(keyModsPathGenshin);
     String defaultPath = p.join(
-      getUserProfilePath(),
+      getUserProfilePathWindows(),
       r'AppData\Roaming\XXMI Launcher\GIMI\Mods',
     );
     if (result == null) {
@@ -213,7 +220,7 @@ class SharedPrefUtils {
   String getHsrModsPath() {
     String? result = _prefs?.getString(keyModsPathHsr);
     String defaultPath = p.join(
-      getUserProfilePath(),
+      getUserProfilePathWindows(),
       r'AppData\Roaming\XXMI Launcher\SRMI\Mods',
     );
     if (result == null) {
@@ -233,7 +240,7 @@ class SharedPrefUtils {
   String getZzzModsPath() {
     String? result = _prefs?.getString(keyModsPathZzz);
     String defaultPath = p.join(
-      getUserProfilePath(),
+      getUserProfilePathWindows(),
       r'AppData\Roaming\XXMI Launcher\ZZMI\Mods',
     );
     if (result == null) {
@@ -253,7 +260,7 @@ class SharedPrefUtils {
   String getEndfieldModsPath() {
     String? result = _prefs?.getString(keyModsPathEndfield);
     String defaultPath = p.join(
-      getUserProfilePath(),
+      getUserProfilePathWindows(),
       r'AppData\Roaming\XXMI Launcher\EFMI\Mods',
     );
     if (result == null) {
@@ -326,12 +333,38 @@ class SharedPrefUtils {
     }
   }
 
+  int getBorderOpacity() {
+    int? result = _prefs?.getInt(keyBorderOpacity);
+    if (result == null) {
+      return 255;
+    } else {
+      return result.clamp(0, 255).toInt();
+    }
+  }
+
+  double getWindowCornerRadius() {
+    double? result = _prefs?.getDouble(keyWindowCornerRadius);
+    if (result == null) {
+      return 25;
+    } else {
+      return result.clamp(0, 50);
+    }
+  }
+
   Future<void> setOverallScale(double scale) async {
     await _prefs?.setDouble(keyOverallScale, scale);
   }
 
   Future<void> setBgTransparency(int alpha) async {
     await _prefs?.setInt(keyBgTransparency, alpha);
+  }
+
+  Future<void> setBorderOpacity(int alpha) async {
+    await _prefs?.setInt(keyBorderOpacity, alpha);
+  }
+
+  Future<void> setWindowCornerRadius(double radius) async {
+    await _prefs?.setDouble(keyWindowCornerRadius, radius);
   }
 
   Future<void> setGroupSort(int sortMethod) async {
@@ -551,6 +584,8 @@ class SharedPrefUtils {
 
   static const String keyOverallScale = "overallScale";
   static const String keyBgTransparency = "backgroundTransparency";
+  static const String keyBorderOpacity = "borderOpacity";
+  static const String keyWindowCornerRadius = "windowCornerRadius";
 
   static const String keySortGroupMethod = "sortGroup";
 
@@ -574,7 +609,7 @@ class SharedPrefUtils {
 
   static const String keyLastOpened = "lastOpened";
 
-  String getUserProfilePath() {
+  String getUserProfilePathWindows() {
     if (Platform.isWindows) {
       final userProfile = Platform.environment['USERPROFILE'];
       if (userProfile != null) {
