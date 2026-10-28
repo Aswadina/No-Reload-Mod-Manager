@@ -223,6 +223,7 @@ Future<void> setupWindow(List<String> args) async {
 
     bitsdojo.appWindow.minSize = minSize;
     bitsdojo.appWindow.size = savedSize;
+    await windowManager.setSize(savedSize);
     bitsdojo.appWindow.alignment = Alignment.center;
 
     WindowOptions windowOptions = WindowOptions(
@@ -435,6 +436,12 @@ class _BackgroundState extends ConsumerState<Background> {
     }
   }
 
+  Color getBackgroundColor(WidgetRef ref) {
+    final rgb = ref.watch(backgroundColorProvider);
+    final a = ref.watch(bgTransparencyProvider);
+    return Color.fromARGB(a, rgb.$1, rgb.$2, rgb.$3);
+  }
+
   @override
   Widget build(BuildContext context) {
     final sss = ref.watch(zoomScaleProvider);
@@ -445,7 +452,7 @@ class _BackgroundState extends ConsumerState<Background> {
           padding: EdgeInsets.only(top: Platform.isWindows ? 1 : 0),
           child: Container(
             decoration: BoxDecoration(
-              color: Color.fromARGB(ref.watch(bgTransparencyProvider), 0, 0, 0),
+              color: getBackgroundColor(ref),
               borderRadius: BorderRadius.circular(
                 ref.watch(windowCornerRadiusProvider) * sss,
               ),
@@ -1612,6 +1619,14 @@ class _MainViewState extends ConsumerState<MainView>
 
   Future<void> showReplicatedContextMenu() async {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    try {
+      final listAnimController = ref.read(animControllerSpecialSnackbar);
+      for (var controller in listAnimController) {
+        try {
+          unawaited(controller.reverse());
+        } catch (_) {}
+      }
+    } catch (_) {}
 
     if (ref.read(alertDialogShownProvider)) {
       await windowManager.show();
@@ -1992,7 +2007,8 @@ void changeWindowTitleName(String gameName, {WidgetRef? ref}) {
 }
 
 Color getAccentColor(WidgetRef ref, {int alpha = 255}) {
-  return Color.fromARGB(alpha, 33, 149, 243);
+  final rgb = ref.watch(accentColorProvider);
+  return Color.fromARGB(alpha, rgb.$1, rgb.$2, rgb.$3);
 }
 
 class RandomTips extends ConsumerStatefulWidget {
