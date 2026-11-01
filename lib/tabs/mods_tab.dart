@@ -1,4 +1,5 @@
 import 'package:no_reload_mod_manager/custom/only_equipped.dart';
+import 'package:no_reload_mod_manager/custom/drop_paths.dart';
 import 'dart:io';
 
 import 'package:collection/collection.dart';
@@ -112,47 +113,6 @@ class _GroupContainerState extends ConsumerState<GroupContainer> {
   bool isHovering = false;
   bool _draggingOnGroup = false;
   DateTime? dateTimeFavorite;
-
-  List<String> parseDropPaths(List<dynamic> files) {
-    final Set<String> results = {};
-    for (var f in files) {
-      String rawPath = f.path;
-      // Split by newlines in case paths got merged (happens on some platforms/bugs)
-      // Also replace literal '\n' and '\r' strings with actual newlines to support Windows Chrome drops properly
-      final lines = rawPath
-          .replaceAll(r'\n', '\n')
-          .replaceAll(r'\r', '\r')
-          .split(RegExp(r'[\r\n]+'));
-      for (var line in lines) {
-        line = line.trim();
-        if (line.isEmpty) continue;
-
-        // Handle file:// URIs
-        if (line.startsWith('file:')) {
-          try {
-            // Decode percent-encoded characters like %20 to space
-            String decoded = Uri.decodeFull(line);
-            // Strip "file:" and any following forward or backward slashes
-            decoded = decoded.replaceFirst(RegExp(r'^file:[\/\\]+'), '');
-            // On Windows, if the path starts with a slash, strip it if followed by a drive letter (e.g. /C:/ -> C:/)
-            if (Platform.isWindows &&
-                decoded.startsWith('/') &&
-                decoded.length > 2 &&
-                decoded[2] == ':') {
-              decoded = decoded.substring(1);
-            }
-            results.add(p.normalize(decoded));
-            continue;
-          } catch (_) {
-            // Fallback stripping if Uri parsing fails
-            line = line.replaceFirst(RegExp(r'^file:[\/\\]+'), '');
-          }
-        }
-        results.add(p.normalize(line));
-      }
-    }
-    return results.toList();
-  }
 
   bool isFolderAndExist(String path) {
     try {
