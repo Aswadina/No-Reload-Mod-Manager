@@ -145,3 +145,7 @@ flutter:
       - family: CustomIcons
         fonts:
           - asset: fonts/CustomIcons.ttf
+# NRMM fork: patched desktop_drop 0.6.1 (fixes a crash on drop). See third_party/desktop_drop.
+dependency_overrides:
+  desktop_drop:
+    path: third_party/desktop_drop
