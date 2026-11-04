@@ -88,6 +88,20 @@ Not checked yet: how mods behind a content warning behave; the exact category fi
 - **Warnings (my call):** if `_sAvResult` is not clean, or the mod is withheld/trashed/private,
   Download is disabled with a short reason.
 
+## Changes made while building (rulings)
+
+- **Tab position:** the tab is last (Keybinds, Mods, Settings, GameBanana), not between Mods and
+  Settings. Settings is "tab 2" in about a dozen upstream places; adding at the end avoids
+  editing them all. The tab bar grows from 350 to 470 wide.
+- **Backup location:** the old folder of an updated mod goes to `<game folder>\NRMM_GB_Backups`
+  (next to `Mods`), not `<name>_old` inside the group, because any folder inside a group counts
+  as a mod and would show up in NRMM.
+- **Card "Update" badge:** compares the mod's `_tsDateUpdated` with the value stored at download.
+  GameBanana does not send that date for every mod; then no badge shows and the details dialog
+  (which checks the newest file exactly) is the source of truth.
+- **Lazy loading:** nothing is requested until the user first opens the tab.
+- **Not done:** setting the mod's NRMM icon from the GameBanana picture; auto-running Update Mod Data.
+
 ## Left to the builder
 
 - HTTP: the app already has `http` and a shared `httpClient`; use them. Set a plain User-Agent
