@@ -17,6 +17,16 @@ releases.
 Keep personal Dart changes in new files under `lib/custom/` where possible, and
 keep edits to upstream files small. That keeps future upstream merges free of conflicts.
 
+## UI groups (personal feature)
+
+Code: `lib/custom/ui_group*.dart`. Design: `docs/superpowers/specs/2026-11-04-ui-groups-design.md`.
+
+A UI group is a normal `group_N` folder with a `uigroup` marker file. Each mod in it is
+rewritten as its own two-state group `group_K` (slot 0 off, slot 1 on), so several can be
+on at once with no F10. Marker files: `uigroup` (group folder), `uikey` (mod's K, 1..500,
+never equal to a real group number), `uistate` (last on/off sent). The hook in
+`updateModData` (`mod_manager.dart`) calls `prepareUiKeys` and `manageUiGroup`.
+
 ## The self-update job
 
 Code: `tools/self-update/`. Design: `docs/superpowers/specs/2026-10-11-self-update-pipeline-design.md`.
