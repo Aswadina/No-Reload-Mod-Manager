@@ -56,3 +56,5 @@ dsa_priv.pem
 /macos
 # Widget Preview related
 .widget_preview/
+
+.superpowers/
