@@ -1,4 +1,6 @@
 import 'package:no_reload_mod_manager/custom/only_equipped.dart';
+import 'package:no_reload_mod_manager/custom/ui_group_files.dart';
+import 'package:no_reload_mod_manager/custom/ui_group_manage.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -1417,6 +1419,11 @@ Future<List<TextSpan>> updateModData(
     //Fix any crash line that's not in _MANAGED_ folder, if any
     await _fixNonManagedModsCrashLine(errorReport, managedPath);
 
+    final uiKeys = await prepareUiKeys(groupAndModsPair);
+    final groupIniTemplate = await rootBundle.loadString(
+      'assets/template_txt/template_group.txt',
+    );
+
     await Future.wait([
       for (final entry in groupAndModsPair.entries)
         () async {
@@ -1434,6 +1441,36 @@ Future<List<TextSpan>> updateModData(
             operationLogs,
             errorShouldTryAgain,
           );
+
+          //UI group: each mod is its own two-state group, see custom/ui_group_files.dart
+          if (await isUiGroupFolder(groupPath)) {
+            await manageUiGroup(
+              groupPath: groupPath,
+              mods: modDatas,
+              keys: uiKeys,
+              template: groupIniTemplate,
+              manageMod:
+                  (modPath, k) => _manageMod(
+                    modPath,
+                    'group_$k',
+                    1,
+                    k,
+                    operationLogs,
+                    errorReport,
+                    errorShouldTryAgain,
+                  ),
+              logError: (message) {
+                errorShouldTryAgain.value = true;
+                operationLogs.add(
+                  TextSpan(
+                    text: '$message\n\n',
+                    style: GoogleFonts.poppins(color: Colors.red, fontSize: 14),
+                  ),
+                );
+              },
+            );
+            return;
+          }
 
           // for (var mod in modDatas) {
           //   if (mod.modIcon == null) {
