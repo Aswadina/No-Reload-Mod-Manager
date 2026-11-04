@@ -1,4 +1,6 @@
 import 'package:no_reload_mod_manager/custom/only_equipped.dart';
+import 'package:no_reload_mod_manager/custom/ui_group.dart';
+import 'package:no_reload_mod_manager/custom/ui_group_import.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
@@ -275,6 +277,7 @@ class _ModAreaGridState extends ConsumerState<ModAreaGrid>
   @override
   Widget build(BuildContext context) {
     double sss = ref.watch(zoomScaleProvider);
+    final uiShown = uiShownIndexes(ref, widget.currentGroupData);
     return MouseRegion(
       onHover: (_) {
         if (!mouseWasMoved) {
@@ -319,6 +322,14 @@ class _ModAreaGridState extends ConsumerState<ModAreaGrid>
                           isActiveInGrid: modData.key == indexOfActiveGridMod,
                           isGrid: true,
                           onSelected: () async {
+                            if (uiShown != null) {
+                              await toggleUiMod(
+                                ref,
+                                widget.currentGroupData,
+                                modData.key,
+                              );
+                              return;
+                            }
                             _scrollToItem(modData.key);
                             unawaited(
                               selectModWithLoadMode(
@@ -338,10 +349,11 @@ class _ModAreaGridState extends ConsumerState<ModAreaGrid>
                           onTap: () {},
                           index: modData.key,
                           isSelected:
+                              uiShown?.contains(modData.key) ??
                               widget
-                                  .currentGroupData
-                                  .previousSelectedModOnGroup ==
-                              modData.key,
+                                      .currentGroupData
+                                      .previousSelectedModOnGroup ==
+                                  modData.key,
                           currentGroupData: widget.currentGroupData,
                         ),
                       ),
@@ -950,6 +962,14 @@ class _GroupAreaState extends ConsumerState<GroupAreaGrid>
                                 label: 'Group icon'.tr(),
                               ),
                               loadModeMenu(ref, groupData.groupPath, sss),
+                              uiGroupMenu(ref, groupData.groupPath, sss),
+                              if (isUiGroup(ref, groupData.groupPath))
+                                importLooseModsMenu(
+                                  context,
+                                  ref,
+                                  groupData.groupPath,
+                                  sss,
+                                ),
                               CustomMenuItem.submenu(
                                 label: "Open with".tr(),
                                 scale: sss,

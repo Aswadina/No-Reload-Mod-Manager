@@ -1,4 +1,6 @@
 import 'package:no_reload_mod_manager/custom/only_equipped.dart';
+import 'package:no_reload_mod_manager/custom/ui_group.dart';
+import 'package:no_reload_mod_manager/custom/ui_group_import.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -701,6 +703,16 @@ class _GroupAreaState extends ConsumerState<GroupAreaCarousel>
                           ),
                         if (index == currentPageIndex)
                           loadModeMenu(ref, groupData.groupPath, sss),
+                        if (index == currentPageIndex)
+                          uiGroupMenu(ref, groupData.groupPath, sss),
+                        if (index == currentPageIndex &&
+                            isUiGroup(ref, groupData.groupPath))
+                          importLooseModsMenu(
+                            context,
+                            ref,
+                            groupData.groupPath,
+                            sss,
+                          ),
                         if (index == currentPageIndex)
                           CustomMenuItem.submenu(
                             label: "Open with".tr(),
@@ -1503,6 +1515,7 @@ class _ModAreaState extends ConsumerState<ModAreaCarousel>
   @override
   Widget build(BuildContext context) {
     final sss = ref.watch(zoomScaleProvider);
+    final uiShown = uiShownIndexes(ref, widget.currentGroupData);
 
     ref.listen(currentGroupIndexProvider, (previous, next) {
       goToSelectedModIndex();
@@ -1547,6 +1560,7 @@ class _ModAreaState extends ConsumerState<ModAreaCarousel>
               double itemHeight = isCentered ? 217.8 * sss : 156.816 * sss;
               return ModContainer(
                 isSelected:
+                    uiShown?.contains(index) ??
                     widget.currentGroupData.previousSelectedModOnGroup == index,
                 index: index,
                 currentGroupData: widget.currentGroupData,
@@ -1555,6 +1569,10 @@ class _ModAreaState extends ConsumerState<ModAreaCarousel>
                 isGrid: false,
                 isActiveInGrid: false,
                 onSelected: () async {
+                  if (uiShown != null) {
+                    await toggleUiMod(ref, widget.currentGroupData, index);
+                    return;
+                  }
                   unawaited(
                     selectModWithLoadMode(
                       ref.read(targetGameProvider),
