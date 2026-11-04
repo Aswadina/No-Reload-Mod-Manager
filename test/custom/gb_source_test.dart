@@ -98,7 +98,7 @@ void main() {
     final found = await scanInstalled(tmp.path);
 
     expect(found.keys.toSet(), {42, 7});
-    expect(found[42]!.modPath, a);
+    expect(p.equals(found[42]!.modPath, a), true);
     expect(found[7]!.source.modDateUpdated, isNull);
   });
 
