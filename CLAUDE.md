@@ -27,6 +27,17 @@ on at once with no F10. Marker files: `uigroup` (group folder), `uikey` (mod's K
 never equal to a real group number), `uistate` (last on/off sent). The hook in
 `updateModData` (`mod_manager.dart`) calls `prepareUiKeys` and `manageUiGroup`.
 
+## GameBanana tab (personal feature)
+
+Code: `lib/custom/gb/`. Design: `docs/superpowers/specs/2026-11-04-gamebanana-design.md`.
+
+Fourth tab (after Settings) to browse/search/download/update mods. `gb_api.dart` is the only
+file that knows GameBanana's JSON. Each downloaded mod gets a `gbsource.json` in its folder
+(mod id, file id, dates) so NRMM can show Installed/Update. Updates move the old folder to
+`<game folder>\NRMM_GB_Backups` (never deleted). Upstream edits are in `lib/main.dart` only
+(tab list, tab count, tab bar width, the E key limit). GameBanana's rate limits are unknown, so
+keep requests few: 15 per page, no polling.
+
 ## The self-update job
 
 Code: `tools/self-update/`. Design: `docs/superpowers/specs/2026-10-11-self-update-pipeline-design.md`.

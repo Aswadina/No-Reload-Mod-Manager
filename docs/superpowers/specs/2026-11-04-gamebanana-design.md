@@ -42,12 +42,19 @@ Base: `https://gamebanana.com/apiv11`
   `_tsDateAdded`, `_sDownloadUrl` (`https://gamebanana.com/dl/<fileId>`), `_sMd5Checksum`,
   `_sAvResult`, `_sDescription`, plus `_sText` (HTML description), `_aRequirements`,
   `_bIsWithheld`, `_bIsTrashed`, `_bIsPrivate`.
-- Genshin Impact's game id is **8552**. The ids for the other games are not known yet.
+- Game ids (checked via `/Util/Search/Results?_sModelName=Game`): Genshin Impact **8552**,
+  Honkai: Star Rail **18366**, Zenless Zone Zero **19567**, Wuthering Waves **20357**,
+  Arknights: Endfield **21842**.
 - `_sVersion` is unreliable (one mod said 4.2 while its newest file was v5.0).
   **Update detection must compare the newest file's `_idRow` / `_tsDateAdded`, not the version text.**
 
-Not checked yet: GameBanana's rate limits and terms of use; how mods behind a content
-warning behave; the other games' ids; the exact sort and category filter parameters.
+Checked, with no answer found: GameBanana's rate limits and rules for automated use. No search
+result or documentation mentions them, and the terms page says nothing about API or bot access.
+So this is **unknown, not permitted**. Be gentle: 15 results per page, one request at a time,
+cache results for the session, no background polling, a plain User-Agent, and on HTTP 429 or
+5xx stop and tell the user instead of retrying in a loop.
+
+Not checked yet: how mods behind a content warning behave; the exact category filter parameters.
 
 ## How it should work (the parts the user decided are marked; the rest are my calls)
 
@@ -80,6 +87,20 @@ warning behave; the other games' ids; the exact sort and category filter paramet
   stays untouched.
 - **Warnings (my call):** if `_sAvResult` is not clean, or the mod is withheld/trashed/private,
   Download is disabled with a short reason.
+
+## Changes made while building (rulings)
+
+- **Tab position:** the tab is last (Keybinds, Mods, Settings, GameBanana), not between Mods and
+  Settings. Settings is "tab 2" in about a dozen upstream places; adding at the end avoids
+  editing them all. The tab bar grows from 350 to 470 wide.
+- **Backup location:** the old folder of an updated mod goes to `<game folder>\NRMM_GB_Backups`
+  (next to `Mods`), not `<name>_old` inside the group, because any folder inside a group counts
+  as a mod and would show up in NRMM.
+- **Card "Update" badge:** compares the mod's `_tsDateUpdated` with the value stored at download.
+  GameBanana does not send that date for every mod; then no badge shows and the details dialog
+  (which checks the newest file exactly) is the source of truth.
+- **Lazy loading:** nothing is requested until the user first opens the tab.
+- **Not done:** setting the mod's NRMM icon from the GameBanana picture; auto-running Update Mod Data.
 
 ## Left to the builder
 

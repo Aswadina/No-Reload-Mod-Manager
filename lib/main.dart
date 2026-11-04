@@ -28,6 +28,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:bitsdojo_window/bitsdojo_window.dart' as bitsdojo;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:no_reload_mod_manager/custom/gb/gb_tab.dart';
 import 'package:no_reload_mod_manager/tabs/keybinds_tab.dart';
 import 'package:no_reload_mod_manager/tabs/mods_tab.dart';
 import 'package:no_reload_mod_manager/tabs/settings_tab.dart';
@@ -677,7 +678,7 @@ class _MainViewState extends ConsumerState<MainView>
         tray.TrayListener {
   late TabController _tabController;
 
-  List<Widget> _views = [TabKeybinds(), TabModsLoading(), TabSettings()];
+  List<Widget> _views = [TabKeybinds(), TabModsLoading(), TabSettings(), TabGameBanana()];
 
   @override
   void onWindowBlur() {
@@ -1131,7 +1132,7 @@ class _MainViewState extends ConsumerState<MainView>
     windowManager.addListener(this);
 
     _tabController = TabController(
-      length: 3,
+      length: 4,
       vsync: this,
       initialIndex: ref.read(tabIndexProvider),
     );
@@ -1493,7 +1494,7 @@ class _MainViewState extends ConsumerState<MainView>
     ref.read(searchBarShownProvider.notifier).state = false;
 
     setState(() {
-      _views = [TabKeybinds(), TabModsLoading(), TabSettings()];
+      _views = [TabKeybinds(), TabModsLoading(), TabSettings(), TabGameBanana()];
     });
     TargetGame targetGame = ref.read(targetGameProvider);
     if (targetGame == TargetGame.none) return;
@@ -1608,11 +1609,17 @@ class _MainViewState extends ConsumerState<MainView>
 
     setState(() {
       existAndValid
-          ? _views = [TabKeybinds(), TabMods(), TabSettings()]
+          ? _views = [
+            TabKeybinds(),
+            TabMods(),
+            TabSettings(),
+            TabGameBanana(),
+          ]
           : _views = [
             TabKeybinds(),
             TabModsNotReady(notReadyReason: notReadyReason),
             TabSettings(),
+            TabGameBanana(),
           ];
     });
   }
@@ -1777,7 +1784,7 @@ class _MainViewState extends ConsumerState<MainView>
                   scale: sss,
                   alignment: Alignment.topCenter,
                   child: SizedBox(
-                    width: 350,
+                    width: 470,
 
                     child: SegmentedTabControl(
                       controller: _tabController,
@@ -1804,6 +1811,7 @@ class _MainViewState extends ConsumerState<MainView>
                         SegmentTab(label: "Keybinds".tr()),
                         SegmentTab(label: "Mods".tr()),
                         SegmentTab(label: "Settings".tr()),
+                        SegmentTab(label: "GameBanana"),
                       ],
                     ),
                   ),
@@ -1869,7 +1877,7 @@ class _MainViewState extends ConsumerState<MainView>
   void onKeyEvent(KeyEvent value, Controller? controller) {
     if (_tabController.index == 1 && !ref.read(isCarouselProvider)) return;
     if (value.physicalKey == PhysicalKeyboardKey.keyE &&
-        _tabController.index != 2) {
+        _tabController.index < _tabController.length - 1) {
       _tabController.animateTo(_tabController.index + 1);
     } else if (value.physicalKey == PhysicalKeyboardKey.keyQ &&
         _tabController.index != 0) {

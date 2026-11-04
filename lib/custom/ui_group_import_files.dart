@@ -38,22 +38,28 @@ Future<int> importModFolders(
   var moved = 0;
   for (final folder in folders) {
     try {
-      final target = await _freeTarget(
-        p.join(targetGroupPath, p.basename(folder)),
-      );
-      try {
-        await Directory(folder).rename(target);
-      } on FileSystemException {
-        // Different drive: rename cannot cross drives, so copy then delete.
-        await _copyDir(Directory(folder), Directory(target));
-        await Directory(folder).delete(recursive: true);
-      }
+      await moveFolderInto(folder, targetGroupPath);
       moved++;
     } catch (_) {
       // Leave this folder where it was and carry on with the others.
     }
   }
   return moved;
+}
+
+/// Moves [folder] into [targetDir] under a name that is not taken yet, and
+/// returns the new path. Creates [targetDir] if needed. Throws on failure.
+Future<String> moveFolderInto(String folder, String targetDir) async {
+  await Directory(targetDir).create(recursive: true);
+  final target = await _freeTarget(p.join(targetDir, p.basename(folder)));
+  try {
+    await Directory(folder).rename(target);
+  } on FileSystemException {
+    // Different drive: rename cannot cross drives, so copy then delete.
+    await _copyDir(Directory(folder), Directory(target));
+    await Directory(folder).delete(recursive: true);
+  }
+  return target;
 }
 
 Future<String> _freeTarget(String target) async {

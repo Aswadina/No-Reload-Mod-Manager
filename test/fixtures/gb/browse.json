@@ -1,0 +1,255 @@
+{
+    "_aMetadata": {
+        "_nRecordCount": 13254,
+        "_bIsComplete": false,
+        "_nPerpage": 2
+    },
+    "_aRecords": [
+        {
+            "_idRow": 736306,
+            "_sModelName": "Mod",
+            "_sSingularTitle": "Mod",
+            "_sIconClasses": "SubmissionType Mod",
+            "_sName": "Travelerless 7.2",
+            "_sProfileUrl": "https:\/\/gamebanana.com\/mods\/736306",
+            "_tsDateAdded": 1793811225,
+            "_tsDateModified": 1793811225,
+            "_bHasFiles": true,
+            "_aTags": [],
+            "_aPreviewMedia": {
+                "_aImages": [
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sCaption": "Regular",
+                        "_sFile": "6aeb61e72723d.jpg",
+                        "_sFile220": "220-90_6aeb61e72723d.jpg",
+                        "_hFile220": 124,
+                        "_wFile220": 220,
+                        "_sFile530": "530-90_6aeb61e72723d.jpg",
+                        "_hFile530": 298,
+                        "_wFile530": 530,
+                        "_sFile100": "100-90_6aeb61e72723d.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sCaption": "Skin",
+                        "_sFile": "6aeb61ed78e89.jpg",
+                        "_sFile100": "100-90_6aeb61ed78e89.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sCaption": "Recolor",
+                        "_sFile": "6aeb61ea35fc8.jpg",
+                        "_sFile100": "100-90_6aeb61ea35fc8.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sCaption": "The Grand Defense: Defy the Unjust Judgement",
+                        "_sFile": "6aeb61efe1e56.jpg",
+                        "_sFile100": "100-90_6aeb61efe1e56.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sCaption": "Map banner",
+                        "_sFile": "6aeb61f6f0451.jpg",
+                        "_sFile100": "100-90_6aeb61f6f0451.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    }
+                ]
+            },
+            "_aSubmitter": {
+                "_idRow": 3689039,
+                "_sName": "Hoonah",
+                "_bIsOnline": true,
+                "_bHasRipe": false,
+                "_sProfileUrl": "https:\/\/gamebanana.com\/members\/3689039",
+                "_sAvatarUrl": "https:\/\/images.gamebanana.com\/img\/av\/69f12a92380c2.png"
+            },
+            "_aGame": {
+                "_idRow": 8552,
+                "_sName": "Genshin Impact",
+                "_sProfileUrl": "https:\/\/gamebanana.com\/games\/8552",
+                "_sIconUrl": "https:\/\/images.gamebanana.com\/img\/ico\/games\/686d7fdcbeb5a.png"
+            },
+            "_aRootCategory": {
+                "_sName": "UI",
+                "_sProfileUrl": "https:\/\/gamebanana.com\/mods\/cats\/22474",
+                "_sIconUrl": "https:\/\/images.gamebanana.com\/img\/ico\/ModCategory\/64481b8707fc4.png"
+            },
+            "_sVersion": "",
+            "_bIsObsolete": false,
+            "_sInitialVisibility": "show",
+            "_bHasContentRatings": false,
+            "_nLikeCount": 10,
+            "_nPostCount": 4,
+            "_bWasFeatured": false,
+            "_nViewCount": 150,
+            "_bIsOwnedByAccessor": false
+        },
+        {
+            "_idRow": 736226,
+            "_sModelName": "Mod",
+            "_sSingularTitle": "Mod",
+            "_sIconClasses": "SubmissionType Mod",
+            "_sName": "Mavuika - Nord Express",
+            "_sProfileUrl": "https:\/\/gamebanana.com\/mods\/736226",
+            "_tsDateAdded": 1793791955,
+            "_tsDateModified": 1793791955,
+            "_bHasFiles": true,
+            "_aTags": [
+                "Software Used: Blender",
+                "Character: Mavuika",
+                "Theme: Winter",
+                "Theme: Hoyofair",
+                "Theme: Snezhnaya"
+            ],
+            "_aPreviewMedia": {
+                "_aImages": [
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb166dbf997.jpg",
+                        "_sFile220": "220-90_6aeb166dbf997.jpg",
+                        "_hFile220": 131,
+                        "_wFile220": 220,
+                        "_sFile530": "530-90_6aeb166dbf997.jpg",
+                        "_hFile530": 315,
+                        "_wFile530": 530,
+                        "_sFile100": "100-90_6aeb166dbf997.jpg",
+                        "_hFile100": 60,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb166e12ab2.jpg",
+                        "_sFile100": "100-90_6aeb166e12ab2.jpg",
+                        "_hFile100": 113,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb1670562e9.jpg",
+                        "_sFile100": "100-90_6aeb1670562e9.jpg",
+                        "_hFile100": 57,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb167a83b34.jpg",
+                        "_sFile100": "100-90_6aeb167a83b34.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb1679ddaa1.jpg",
+                        "_sFile100": "100-90_6aeb1679ddaa1.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb167abbf22.jpg",
+                        "_sFile100": "100-90_6aeb167abbf22.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb167b310a7.jpg",
+                        "_sFile100": "100-90_6aeb167b310a7.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb167a21538.jpg",
+                        "_sFile100": "100-90_6aeb167a21538.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb167aeb277.jpg",
+                        "_sFile100": "100-90_6aeb167aeb277.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    },
+                    {
+                        "_sType": "screenshot",
+                        "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                        "_sFile": "6aeb167a25b99.jpg",
+                        "_sFile100": "100-90_6aeb167a25b99.jpg",
+                        "_hFile100": 56,
+                        "_wFile100": 100
+                    }
+                ]
+            },
+            "_aSubmitter": {
+                "_idRow": 2593182,
+                "_sName": "DasBirb",
+                "_bIsOnline": false,
+                "_bHasRipe": false,
+                "_sProfileUrl": "https:\/\/gamebanana.com\/members\/2593182",
+                "_sAvatarUrl": "https:\/\/images.gamebanana.com\/img\/av\/6731341f021fd.gif",
+                "_sUpicUrl": "https:\/\/images.gamebanana.com\/img\/upic\/65ee132c42bef.png",
+                "_aSubjectShaper": {
+                    "_sBorderStyle": "Stroke",
+                    "_sFont": "Verdana",
+                    "_sTextColor": "#c4e184",
+                    "_sTextHoverColor": "#ff5c5c",
+                    "_sBorderColor": "#206a0b",
+                    "_sBorderHoverColor": "#891010"
+                },
+                "_sSubjectShaperCssCode": "font-family:'Verdana';color:#c4e184;"
+            },
+            "_aGame": {
+                "_idRow": 8552,
+                "_sName": "Genshin Impact",
+                "_sProfileUrl": "https:\/\/gamebanana.com\/games\/8552",
+                "_sIconUrl": "https:\/\/images.gamebanana.com\/img\/ico\/games\/686d7fdcbeb5a.png"
+            },
+            "_aRootCategory": {
+                "_sName": "Skins",
+                "_sProfileUrl": "https:\/\/gamebanana.com\/mods\/cats\/17510",
+                "_sIconUrl": "https:\/\/images.gamebanana.com\/img\/ico\/ModCategory\/62ad1d74107fa.png"
+            },
+            "_aSubCategory": {
+                "_sName": "Mavuika",
+                "_sProfileUrl": "https:\/\/gamebanana.com\/mods\/cats\/31621",
+                "_sIconUrl": "https:\/\/images.gamebanana.com\/img\/ico\/ModCategory\/69932fcd359d0.png"
+            },
+            "_sVersion": "",
+            "_bIsObsolete": false,
+            "_sInitialVisibility": "show",
+            "_bHasContentRatings": false,
+            "_nLikeCount": 18,
+            "_nPostCount": 1,
+            "_bWasFeatured": false,
+            "_nViewCount": 756,
+            "_bIsOwnedByAccessor": false
+        }
+    ]
+}
