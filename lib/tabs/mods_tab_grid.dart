@@ -1,5 +1,6 @@
 import 'package:no_reload_mod_manager/custom/only_equipped.dart';
 import 'package:no_reload_mod_manager/custom/ui_group.dart';
+import 'package:no_reload_mod_manager/custom/ui_group_import.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
@@ -962,6 +963,13 @@ class _GroupAreaState extends ConsumerState<GroupAreaGrid>
                               ),
                               loadModeMenu(ref, groupData.groupPath, sss),
                               uiGroupMenu(ref, groupData.groupPath, sss),
+                              if (isUiGroup(ref, groupData.groupPath))
+                                importLooseModsMenu(
+                                  context,
+                                  ref,
+                                  groupData.groupPath,
+                                  sss,
+                                ),
                               CustomMenuItem.submenu(
                                 label: "Open with".tr(),
                                 scale: sss,

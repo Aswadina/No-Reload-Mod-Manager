@@ -1,5 +1,6 @@
 import 'package:no_reload_mod_manager/custom/only_equipped.dart';
 import 'package:no_reload_mod_manager/custom/ui_group.dart';
+import 'package:no_reload_mod_manager/custom/ui_group_import.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -704,6 +705,14 @@ class _GroupAreaState extends ConsumerState<GroupAreaCarousel>
                           loadModeMenu(ref, groupData.groupPath, sss),
                         if (index == currentPageIndex)
                           uiGroupMenu(ref, groupData.groupPath, sss),
+                        if (index == currentPageIndex &&
+                            isUiGroup(ref, groupData.groupPath))
+                          importLooseModsMenu(
+                            context,
+                            ref,
+                            groupData.groupPath,
+                            sss,
+                          ),
                         if (index == currentPageIndex)
                           CustomMenuItem.submenu(
                             label: "Open with".tr(),
