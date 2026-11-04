@@ -42,12 +42,19 @@ Base: `https://gamebanana.com/apiv11`
   `_tsDateAdded`, `_sDownloadUrl` (`https://gamebanana.com/dl/<fileId>`), `_sMd5Checksum`,
   `_sAvResult`, `_sDescription`, plus `_sText` (HTML description), `_aRequirements`,
   `_bIsWithheld`, `_bIsTrashed`, `_bIsPrivate`.
-- Genshin Impact's game id is **8552**. The ids for the other games are not known yet.
+- Game ids (checked via `/Util/Search/Results?_sModelName=Game`): Genshin Impact **8552**,
+  Honkai: Star Rail **18366**, Zenless Zone Zero **19567**, Wuthering Waves **20357**,
+  Arknights: Endfield **21842**.
 - `_sVersion` is unreliable (one mod said 4.2 while its newest file was v5.0).
   **Update detection must compare the newest file's `_idRow` / `_tsDateAdded`, not the version text.**
 
-Not checked yet: GameBanana's rate limits and terms of use; how mods behind a content
-warning behave; the other games' ids; the exact sort and category filter parameters.
+Checked, with no answer found: GameBanana's rate limits and rules for automated use. No search
+result or documentation mentions them, and the terms page says nothing about API or bot access.
+So this is **unknown, not permitted**. Be gentle: 15 results per page, one request at a time,
+cache results for the session, no background polling, a plain User-Agent, and on HTTP 429 or
+5xx stop and tell the user instead of retrying in a loop.
+
+Not checked yet: how mods behind a content warning behave; the exact category filter parameters.
 
 ## How it should work (the parts the user decided are marked; the rest are my calls)
 

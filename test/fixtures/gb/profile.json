@@ -1,0 +1,300 @@
+{
+    "_idRow": 736306,
+    "_nStatus": "0",
+    "_bIsPrivate": false,
+    "_bAccessorIsSubmitter": false,
+    "_bIsTrashed": false,
+    "_bIsWithheld": false,
+    "_sName": "Travelerless 7.2",
+    "_sCommentsMode": "open",
+    "_tsDateModified": 1793811225,
+    "_tsDateAdded": 1793811225,
+    "_sProfileUrl": "https:\/\/gamebanana.com\/mods\/736306",
+    "_aPreviewMedia": {
+        "_aImages": [
+            {
+                "_sType": "screenshot",
+                "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                "_sCaption": "Regular",
+                "_sFile": "6aeb61e72723d.jpg",
+                "_sFile220": "220-90_6aeb61e72723d.jpg",
+                "_hFile220": 124,
+                "_wFile220": 220,
+                "_sFile530": "530-90_6aeb61e72723d.jpg",
+                "_hFile530": 298,
+                "_wFile530": 530,
+                "_sFile100": "100-90_6aeb61e72723d.jpg",
+                "_hFile100": 56,
+                "_wFile100": 100
+            },
+            {
+                "_sType": "screenshot",
+                "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                "_sCaption": "Skin",
+                "_sFile": "6aeb61ed78e89.jpg",
+                "_sFile100": "100-90_6aeb61ed78e89.jpg",
+                "_hFile100": 56,
+                "_wFile100": 100
+            },
+            {
+                "_sType": "screenshot",
+                "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                "_sCaption": "Recolor",
+                "_sFile": "6aeb61ea35fc8.jpg",
+                "_sFile100": "100-90_6aeb61ea35fc8.jpg",
+                "_hFile100": 56,
+                "_wFile100": 100
+            },
+            {
+                "_sType": "screenshot",
+                "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                "_sCaption": "The Grand Defense: Defy the Unjust Judgement",
+                "_sFile": "6aeb61efe1e56.jpg",
+                "_sFile100": "100-90_6aeb61efe1e56.jpg",
+                "_hFile100": 56,
+                "_wFile100": 100
+            },
+            {
+                "_sType": "screenshot",
+                "_sBaseUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods",
+                "_sCaption": "Map banner",
+                "_sFile": "6aeb61f6f0451.jpg",
+                "_sFile100": "100-90_6aeb61f6f0451.jpg",
+                "_hFile100": 56,
+                "_wFile100": 100
+            }
+        ]
+    },
+    "_nUpdatesCount": 0,
+    "_bHasUpdates": false,
+    "_nAllTodosCount": 0,
+    "_bHasTodos": false,
+    "_nPostCount": 4,
+    "_aTags": [],
+    "_bCreatedBySubmitter": true,
+    "_bIsPorted": false,
+    "_nThanksCount": 1,
+    "_sInitialVisibility": "show",
+    "_sDownloadUrl": "https:\/\/gamebanana.com\/mods\/download\/736306",
+    "_nDownloadCount": 14,
+    "_aFiles": [
+        {
+            "_idRow": 1876598,
+            "_sFile": "travelerless_standard.zip",
+            "_nFilesize": 3360758,
+            "_tsDateAdded": 1793811166,
+            "_nDownloadCount": 6,
+            "_sDownloadUrl": "https:\/\/gamebanana.com\/dl\/1876598",
+            "_sMd5Checksum": "36be8876daae24b4e6b1cecc146942e9",
+            "_sAnalysisState": "done",
+            "_sAnalysisResult": "ok",
+            "_sAnalysisResultVerbose": "File passed preliminary analysis",
+            "_sAvState": "done",
+            "_sAvResult": "clean",
+            "_bIsArchived": false,
+            "_bHasContents": true,
+            "_sDescription": "Standard"
+        },
+        {
+            "_idRow": 1876597,
+            "_sFile": "travelerless_skin.zip",
+            "_nFilesize": 3363423,
+            "_tsDateAdded": 1793811165,
+            "_nDownloadCount": 6,
+            "_sDownloadUrl": "https:\/\/gamebanana.com\/dl\/1876597",
+            "_sMd5Checksum": "076c3aced925ca32cc6897a7046d543e",
+            "_sAnalysisState": "done",
+            "_sAnalysisResult": "ok",
+            "_sAnalysisResultVerbose": "File passed preliminary analysis",
+            "_sAvState": "done",
+            "_sAvResult": "clean",
+            "_bIsArchived": false,
+            "_bHasContents": true,
+            "_sDescription": "Skin"
+        },
+        {
+            "_idRow": 1876596,
+            "_sFile": "travelerless_recolor.zip",
+            "_nFilesize": 3362426,
+            "_tsDateAdded": 1793811156,
+            "_nDownloadCount": 2,
+            "_sDownloadUrl": "https:\/\/gamebanana.com\/dl\/1876596",
+            "_sMd5Checksum": "f7a334176893306bfe062a3fa0c40568",
+            "_sAnalysisState": "done",
+            "_sAnalysisResult": "ok",
+            "_sAnalysisResultVerbose": "File passed preliminary analysis",
+            "_sAvState": "done",
+            "_sAvResult": "clean",
+            "_bIsArchived": false,
+            "_bHasContents": true,
+            "_sDescription": "Recolor"
+        }
+    ],
+    "_nSubscriberCount": 0,
+    "_aContributingStudios": [],
+    "_sLicense": "<a rel=\"license\" href=\"http:\/\/creativecommons.org\/licenses\/by-nc-nd\/4.0\/\"><img alt=\"Creative Commons License\" style=\"border-width:0\" src=\"https:\/\/i.creativecommons.org\/l\/by-nc-nd\/4.0\/88x31.png\" \/><\/a><br \/>This work is licensed under a <a rel=\"license\" href=\"http:\/\/creativecommons.org\/licenses\/by-nc-nd\/4.0\/\">Creative Commons Attribution-NonCommercial-NoDerivs 4.0 Unported License<\/a>.",
+    "_aLicenseChecklist": {
+        "yes": [
+            "Download and install this Mod"
+        ],
+        "ask": [
+            "Redistribute this Mod on other sites",
+            "Modify this Mod and distribute the modified Mod on GameBanana",
+            "Modify this Mod and distribute the modified Mod on another site",
+            "Use parts of this Mod in another Mod and distribute the Mod on GameBanana",
+            "Use parts of this Mod in another Mod and distribute the Mod on another site",
+            "Use this Mod or components of this Mod in adult\/NSFW content"
+        ],
+        "no": [
+            "Use this Mod or components of this Mod commercially"
+        ]
+    },
+    "_bGenerateTableOfContents": false,
+    "_sText": "<b>You don't need to like or agree with this mod, but if that's the case, please keep your thoughts to yourself<\/b>. We are all aware of Hoyo's preferred twin for marketing, this is in-game stuff. All choices are canon, they wouldn't be choices otherwise.<br><br>For once in my life I did some work in advance and what does my stupid brain decide? LET'S DO EVEN MORE INSTEAD OF PLAYING THE DAMN QUEST.<br><br>So, appart from the usual Aether removal I also added, TWO extra lumine versions: Skin and skin recolor with her usual blue, all of them accompanied by their own map banner art. I guess it's a good trade for the lack of an actual travelerless version for the main quest art.<br><br><del>Maybe if you beg I could also do an Aether skin ver, spoil you lot a bit more\/j<\/del>",
+    "_bIsObsolete": false,
+    "_nLikeCount": 10,
+    "_nViewCount": 150,
+    "_sVersion": "",
+    "_bAcceptsDonations": false,
+    "_bShowRipePromo": true,
+    "_aEmbeddables": {
+        "_sEmbeddableImageBaseUrl": "https:\/\/gamebanana.com\/mods\/embeddables\/736306",
+        "_aVariants": [
+            "small",
+            "small_square",
+            "medium",
+            "medium_square",
+            "medium_square_minimal",
+            "large",
+            "large_minimal",
+            "large_square",
+            "large_minimal_square",
+            "thumbnail"
+        ]
+    },
+    "_aSubmitter": {
+        "_idRow": 3689039,
+        "_sName": "Hoonah",
+        "_sUserTitle": "Bananite",
+        "_sHonoraryTitle": "",
+        "_tsJoinDate": 1723484770,
+        "_sAvatarUrl": "https:\/\/images.gamebanana.com\/img\/av\/69f12a92380c2.png",
+        "_sSigUrl": "",
+        "_sProfileUrl": "https:\/\/gamebanana.com\/members\/3689039",
+        "_sPointsUrl": "https:\/\/gamebanana.com\/members\/logs\/pointslog\/3689039",
+        "_sMedalsUrl": "https:\/\/gamebanana.com\/members\/stats\/medals\/3689039",
+        "_bIsOnline": false,
+        "_sLocation": "<a href=\"https:\/\/gamebanana.com\">Home<\/a> > <a href=\"https:\/\/gamebanana.com\/games\/8552\"><img src=\"https:\/\/images.gamebanana.com\/img\/ico\/games\/686d7fdcbeb5a.png\"\/><span>Genshin Impact<\/span><\/a> > <a href=\"https:\/\/gamebanana.com\/mods\/games\/8552\">Mods<\/a> > <a href=\"https:\/\/gamebanana.com\/mods\/cats\/22474\">UI<\/a> > <a href=\"https:\/\/gamebanana.com\/mods\/736306\">Travelerless 7.2<\/a>",
+        "_sOnlineTitle": "",
+        "_sOfflineTitle": "",
+        "_nPoints": 3922,
+        "_nPointsRank": 13611,
+        "_aNormalMedals": [
+            [
+                "m_age_1.png",
+                "One month a member",
+                "normal",
+                2218379
+            ],
+            [
+                "m_age_2.png",
+                "6 months a member",
+                "normal",
+                2806049
+            ],
+            [
+                "m_age_3.png",
+                "1 year a member",
+                "normal",
+                3567824
+            ],
+            [
+                "m_pr_1.png",
+                "Reached 1,000 Points",
+                "normal",
+                4718139
+            ],
+            [
+                "thanks_recvd_1.png",
+                "Received thanks 5 times",
+                "normal",
+                4843525
+            ],
+            [
+                "m_pr_2.png",
+                "Reached 2,500 Points",
+                "normal",
+                5060345
+            ],
+            [
+                "m_age_4.png",
+                "2 years a member",
+                "normal",
+                5261416
+            ],
+            [
+                "mods1.png",
+                "Submitted 5 Mods",
+                "normal",
+                5262672
+            ],
+            [
+                "subscribers_1.png",
+                "Reached 10 subscribers",
+                "normal",
+                5473704
+            ]
+        ],
+        "_aRareMedals": [],
+        "_aLegendaryMedals": [],
+        "_bHasRipe": false,
+        "_nBuddyCount": 0,
+        "_nSubscriberCount": 16,
+        "_aDonationMethods": [],
+        "_bAccessorIsBuddy": false,
+        "_bBuddyRequestExistsWithAccessor": false,
+        "_bAccessorIsSubscribed": false,
+        "_aDefaultLicenseChecklist": [
+            "yes",
+            "ask",
+            "ask",
+            "ask",
+            "ask",
+            "ask",
+            "no",
+            "ask"
+        ],
+        "_sDefaultLicense": ""
+    },
+    "_bFollowLinks": true,
+    "_aGame": {
+        "_idRow": 8552,
+        "_sName": "Genshin Impact",
+        "_sAbbreviation": "GI",
+        "_sProfileUrl": "https:\/\/gamebanana.com\/games\/8552",
+        "_sIconUrl": "https:\/\/images.gamebanana.com\/img\/ico\/games\/686d7fdcbeb5a.png",
+        "_sBannerUrl": "https:\/\/images.gamebanana.com\/img\/ico\/games\/686d7fdcbeb5a.png",
+        "_nSubscriberCount": 94256,
+        "_bHasSubmissionQueue": false,
+        "_bAccessorIsSubscribed": false
+    },
+    "_aCategory": {
+        "_idRow": 22474,
+        "_sName": "UI",
+        "_sModelName": "ModCategory",
+        "_sProfileUrl": "https:\/\/gamebanana.com\/mods\/cats\/22474",
+        "_sIconUrl": "https:\/\/images.gamebanana.com\/img\/ico\/ModCategory\/64481b8707fc4.png",
+        "_bIsObsolete": false
+    },
+    "_aCredits": [
+        {
+            "_sGroupName": "Key Authors",
+            "_aAuthors": [
+                {
+                    "_sRole": "artist",
+                    "_sName": "Hoonah"
+                }
+            ]
+        }
+    ]
+}
