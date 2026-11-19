@@ -113,14 +113,18 @@ class GbPage {
   final List<GbMod> mods;
   final int totalCount;
   final int page;
+
+  /// What the server actually used (search ignores our page size and gives 15).
+  final int perPage;
   const GbPage({
     required this.mods,
     required this.totalCount,
     required this.page,
+    this.perPage = gbPerPage,
   });
 
-  bool get hasMore => page * gbPerPage < totalCount;
-  int get totalPages => (totalCount / gbPerPage).ceil();
+  bool get hasMore => page * perPage < totalCount;
+  int get totalPages => perPage <= 0 ? 0 : (totalCount / perPage).ceil();
 }
 
 class GbFile {
@@ -322,6 +326,10 @@ class GbApi {
       ],
       totalCount: meta is Map ? (_int(meta['_nRecordCount']) ?? 0) : 0,
       page: page,
+      perPage:
+          meta is Map && (_int(meta['_nPerpage']) ?? 0) > 0
+              ? _int(meta['_nPerpage'])!
+              : gbPerPage,
     );
   }
 

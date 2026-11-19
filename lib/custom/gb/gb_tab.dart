@@ -1,53 +1,28 @@
-// GameBanana tab — the screen. Look and sizes follow NRMM's own mod cards and
-// dialogs (see mods_tab.dart). Logic lives in gb_api / gb_source / gb_install.
+// GameBanana tab — the browse screen. Look and sizes follow NRMM's own mod
+// cards (see mods_tab.dart). Logic lives in gb_api / gb_source / gb_install.
+//
+// Layout, top to bottom: search + sort, "Find mods for" (your groups),
+// categories, the card grid, then the page bar.
 
 import 'dart:async';
 
-import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:no_reload_mod_manager/custom/gb/gb_api.dart';
-import 'package:no_reload_mod_manager/custom/gb/gb_install.dart';
+import 'package:no_reload_mod_manager/custom/gb/gb_details_dialog.dart';
+import 'package:no_reload_mod_manager/custom/gb/gb_helpers.dart';
+import 'package:no_reload_mod_manager/custom/gb/gb_prefs.dart';
+import 'package:no_reload_mod_manager/custom/gb/gb_services.dart';
 import 'package:no_reload_mod_manager/custom/gb/gb_source.dart';
+import 'package:no_reload_mod_manager/custom/gb/gb_widgets.dart';
 import 'package:no_reload_mod_manager/main.dart';
-import 'package:no_reload_mod_manager/utils/archive_manager.dart';
 import 'package:no_reload_mod_manager/utils/constant_var.dart';
-import 'package:no_reload_mod_manager/utils/get_cloud_data.dart';
 import 'package:no_reload_mod_manager/utils/mod_manager.dart';
 import 'package:no_reload_mod_manager/utils/state_providers.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:no_reload_mod_manager/utils/ui_dialogues.dart';
 
-/// Index of this tab in the tab bar (after Keybinds, Mods, Settings).
-const int gbTabIndex = 3;
-
-/// GameBanana's id for each game NRMM supports (checked against their API).
-const Map<TargetGame, int> gbGameIds = {
-  TargetGame.Genshin_Impact: 8552,
-  TargetGame.Honkai_Star_Rail: 18366,
-  TargetGame.Zenless_Zone_Zero: 19567,
-  TargetGame.Wuthering_Waves: 20357,
-  TargetGame.Arknights_Endfield: 21842,
-};
-
-const _line = Color.fromARGB(127, 255, 255, 255);
-const _dialogColor = Color(0xFF2B2930);
-
-// Files NRMM keeps in a mod folder for the user (custom name, favorite, icon).
-final List<String> _carryOver = [
-  'modname',
-  'fav',
-  ...ConstantVar.modIconFilenames,
-];
-
-final _api = GbApi(httpClient.client);
-
-Future<bool> _sevenZipExtract(String archive, String outDir) async =>
-    (await SevenZip.instance.extract(archive, outputDir: outDir)).success;
-
-String _managedPath(String modsPath) =>
-    p.join(modsPath, ConstantVar.managedFolderName);
+export 'package:no_reload_mod_manager/custom/gb/gb_services.dart'
+    show gbTabIndex;
 
 class TabGameBanana extends ConsumerStatefulWidget {
   const TabGameBanana({super.key});
@@ -58,83 +33,132 @@ class TabGameBanana extends ConsumerStatefulWidget {
 
 class _TabGameBananaState extends ConsumerState<TabGameBanana> {
   final _search = TextEditingController();
+  final _jump = TextEditingController();
   final _scroll = ScrollController();
 
   bool _started = false; // nothing is fetched until the tab is first opened
   bool _loading = false;
   String? _error;
   List<GbMod> _mods = [];
-  int _page = 0;
-  bool _hasMore = false;
+  int _page = 1;
+  int _totalCount = 0;
+  int _totalPages = 0;
   GbSort _sort = GbSort.newest;
+  int? _categoryId;
   String _query = '';
   int _token = 0; // ignores answers that arrive after a newer request
+  TargetGame? _loadedGame;
+  List<GbCategory> _categories = [];
   Map<int, InstalledGbMod> _installed = {};
+
+  // Pages already fetched this session, so going back costs no request.
+  final Map<String, GbPage> _cache = {};
 
   @override
   void initState() {
     super.initState();
-    _scroll.addListener(() {
-      if (_scroll.hasClients &&
-          _scroll.position.pixels > _scroll.position.maxScrollExtent - 300) {
-        _load(reset: false);
-      }
-    });
+    // "Update Mod Data" resets the game to none and back; only react to a real change.
     ref.listenManual(targetGameProvider, (prev, next) {
-      if (_started) _load(reset: true);
+      if (!_started || next == TargetGame.none || next == _loadedGame) return;
+      unawaited(_startForGame());
     });
   }
 
   @override
   void dispose() {
     _search.dispose();
+    _jump.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
   int? get _gameId => gbGameIds[ref.read(targetGameProvider)];
+  String get _gameKey => ref.read(targetGameProvider).name;
 
   Future<void> _refreshInstalled() async {
     final modsPath = ref.read(validModsPath);
     if (modsPath == null) return;
-    final found = await scanInstalled(_managedPath(modsPath));
+    final found = await scanInstalled(gbManagedPath(modsPath));
     if (mounted) setState(() => _installed = found);
   }
 
-  Future<void> _load({required bool reset}) async {
-    final gameId = _gameId;
+  /// First open, or the game changed: restore the remembered view and load.
+  Future<void> _startForGame() async {
+    final game = ref.read(targetGameProvider);
+    final gameId = gbGameIds[game];
+    _loadedGame = game;
+    _cache.clear();
+    _query = '';
+    _search.clear();
+    _mods = [];
+    _error = null;
     if (gameId == null) {
-      setState(() {
-        _mods = [];
-        _error = null;
-      });
+      setState(() {});
       return;
     }
-    if (_loading && !reset) return;
-    if (!reset && !_hasMore) return;
+    final (sort, category) = await GbPrefs.loadBrowse(game.name);
+    if (!mounted) return;
+    setState(() {
+      _sort = sort;
+      _categoryId = category;
+      _categories = [];
+    });
+    unawaited(_refreshInstalled());
+    unawaited(_loadCategories(gameId));
+    await _go(1);
+  }
 
+  Future<void> _loadCategories(int gameId) async {
+    try {
+      final cats = await gbApi.categories(gameId);
+      if (mounted && _gameId == gameId) setState(() => _categories = cats);
+    } catch (_) {
+      // The chips are a bonus; browsing still works without them.
+    }
+  }
+
+  String _key(int gameId, int page) =>
+      '$gameId|${_sort.name}|${_categoryId ?? ''}|$_query|$page';
+
+  Future<void> _go(int page) async {
+    final gameId = _gameId;
+    if (gameId == null) return;
+    final key = _key(gameId, page);
     final token = ++_token;
-    final page = reset ? 1 : _page + 1;
+
+    void show(GbPage result) {
+      _mods = result.mods;
+      _page = page;
+      _totalCount = result.totalCount;
+      _totalPages = result.totalPages;
+      _loading = false;
+      _error = null;
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+    }
+
+    final cached = _cache[key];
+    if (cached != null) {
+      setState(() => show(cached));
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
-      if (reset) {
-        _mods = [];
-        _hasMore = false;
-      }
+      _mods = [];
     });
     try {
       final result =
           _query.isEmpty
-              ? await _api.browse(gameId: gameId, page: page, sort: _sort)
-              : await _api.search(gameId: gameId, query: _query, page: page);
+              ? await gbApi.browse(
+                gameId: gameId,
+                page: page,
+                sort: _sort,
+                categoryId: _categoryId,
+              )
+              : await gbApi.search(gameId: gameId, query: _query, page: page);
       if (!mounted || token != _token) return;
-      setState(() {
-        _mods = reset ? result.mods : [..._mods, ...result.mods];
-        _page = page;
-        _hasMore = result.hasMore && result.mods.isNotEmpty;
-        _loading = false;
-      });
+      _cache[key] = result;
+      setState(() => show(result));
     } on GbException catch (e) {
       if (!mounted || token != _token) return;
       setState(() {
@@ -150,31 +174,62 @@ class _TabGameBananaState extends ConsumerState<TabGameBanana> {
     }
   }
 
-  void _firstOpen() {
-    _started = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      unawaited(_refreshInstalled());
-      unawaited(_load(reset: true));
-    });
+  void _runSearch(String text) {
+    _query = text.trim();
+    if (_query.isNotEmpty) _categoryId = null; // a search covers every category
+    unawaited(GbPrefs.saveBrowse(_gameKey, _sort, _categoryId));
+    unawaited(_go(1));
+  }
+
+  void _pickCategory(int? id) {
+    _categoryId = id;
+    _query = '';
+    _search.clear();
+    unawaited(GbPrefs.saveBrowse(_gameKey, _sort, _categoryId));
+    unawaited(_go(1));
+  }
+
+  void _pickSort(GbSort sort) {
+    _sort = sort;
+    _query = ''; // search results have no sort order, so leave the search
+    _search.clear();
+    unawaited(GbPrefs.saveBrowse(_gameKey, _sort, _categoryId));
+    unawaited(_go(1));
   }
 
   Future<void> _openDetails(GbMod mod) async {
     final modsPath = ref.read(validModsPath);
     if (modsPath == null) return;
     ref.read(alertDialogShownProvider.notifier).state = true;
-    await showDialog(
+    final changed = await showDialog<bool>(
       barrierDismissible: false,
       context: context,
       builder:
-          (_) => _GbDetailsDialog(
+          (_) => GbDetailsDialog(
             mod: mod,
             installed: _installed[mod.id],
             modsPath: modsPath,
+            game: _gameKey,
           ),
     );
     ref.read(alertDialogShownProvider.notifier).state = false;
-    if (mounted) unawaited(_refreshInstalled());
+    if (!mounted) return;
+    unawaited(_refreshInstalled());
+    if (changed == true) await _setUp(modsPath);
+  }
+
+  /// Runs the same "Update Mod Data" step the app offers, so a new mod works at once.
+  Future<void> _setUp(String modsPath) async {
+    ref.read(alertDialogShownProvider.notifier).state = true;
+    await showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder: (_) => UpdateModDialog(modsPath: modsPath),
+    );
+    ref.read(alertDialogShownProvider.notifier).state = false;
+    if (!mounted) return;
+    triggerRefresh(ref);
+    unawaited(_refreshInstalled());
   }
 
   @override
@@ -182,27 +237,42 @@ class _TabGameBananaState extends ConsumerState<TabGameBanana> {
     final sss = ref.watch(zoomScaleProvider);
     final game = ref.watch(targetGameProvider);
     final active = ref.watch(tabIndexProvider) == gbTabIndex;
-    if (active && !_started) _firstOpen();
+    if (active && !_started && game != TargetGame.none) {
+      _started = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_startForGame());
+      });
+    }
 
     return Padding(
       padding: EdgeInsets.only(
         top: 85 * sss,
-        bottom: 15 * sss,
+        bottom: 12 * sss,
         left: 45 * sss,
         right: 45 * sss,
       ),
       child: Column(
         children: [
-          _buildTopBar(sss, game),
-          SizedBox(height: 14 * sss),
-          Expanded(child: _buildBody(sss, game)),
+          _topBar(sss, game),
+          SizedBox(height: 8 * sss),
+          _groupChips(sss),
+          _categoryChips(sss),
+          SizedBox(height: 8 * sss),
+          Expanded(child: _body(sss, game)),
+          if (_totalPages > 0) ...[
+            SizedBox(height: 8 * sss),
+            _pager(sss),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildTopBar(double sss, TargetGame game) {
+  // ---------- rows above the grid ----------
+
+  Widget _topBar(double sss, TargetGame game) {
     final accent = getAccentColor(ref);
+    final hasGame = gbGameIds.containsKey(game);
     return Row(
       children: [
         Expanded(
@@ -210,196 +280,290 @@ class _TabGameBananaState extends ConsumerState<TabGameBanana> {
             height: 38 * sss,
             padding: EdgeInsets.symmetric(horizontal: 16 * sss),
             decoration: BoxDecoration(
-              border: Border.all(color: _line, width: 3 * sss),
+              border: Border.all(color: gbLine, width: 3 * sss),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: TextField(
-              controller: _search,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 12 * sss,
-              ),
-              cursorColor: accent,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                isCollapsed: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 10 * sss),
-                hintText:
-                    gbGameIds.containsKey(game)
-                        ? 'Search ${game.name.replaceAll('_', ' ')} mods…'
-                        : 'Pick a game in Settings first',
-                hintStyle: GoogleFonts.poppins(
-                  color: Colors.white54,
-                  fontSize: 12 * sss,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _search,
+                    enabled: hasGame,
+                    style: gbText(sss, 12),
+                    cursorColor: accent,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      isCollapsed: true,
+                      contentPadding: EdgeInsets.symmetric(vertical: 10 * sss),
+                      hintText:
+                          hasGame
+                              ? 'Search ${game.name.replaceAll('_', ' ')} mods…'
+                              : 'Pick a game in Settings first',
+                      hintStyle: gbText(sss, 12, color: Colors.white54),
+                    ),
+                    onSubmitted: _runSearch,
+                  ),
                 ),
-              ),
-              onSubmitted: (text) {
-                _query = text.trim();
-                _load(reset: true);
-              },
+                if (_search.text.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _search.clear();
+                      if (_query.isNotEmpty) _runSearch('');
+                      setState(() {});
+                    },
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Icon(Icons.close, size: 16 * sss, color: Colors.white70),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
         SizedBox(width: 10 * sss),
-        for (final sort in GbSort.values)
-          Padding(
-            padding: EdgeInsets.only(left: 6 * sss),
-            child: _Chip(
-              label: sort.label,
-              selected: _query.isEmpty && sort == _sort,
-              onTap: () {
-                _search.clear();
-                _query = '';
-                _sort = sort;
-                _load(reset: true);
-              },
+        PopupMenuButton<GbSort>(
+          tooltip: 'Sort',
+          color: gbDialogColor,
+          onSelected: _pickSort,
+          itemBuilder:
+              (_) => [
+                for (final s in GbSort.values)
+                  PopupMenuItem(
+                    value: s,
+                    child: Text(
+                      s.label,
+                      style: gbText(
+                        sss,
+                        12,
+                        weight: s == _sort && _query.isEmpty ? FontWeight.w700 : FontWeight.w400,
+                        color: s == _sort && _query.isEmpty ? accent : Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
+          child: IgnorePointer(
+            child: GbPill(
+              label: 'Sort: ${_query.isEmpty ? _sort.label : 'Relevance'}  ▾',
+              icon: Icons.sort,
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// One chip per group the user already has: a quick way to find a character.
+  Widget _groupChips(double sss) {
+    final terms = <String>[];
+    for (final g in ref.watch(modGroupDataProvider)) {
+      final term = searchTermForGroup(g.groupName);
+      if (term.isEmpty || RegExp(r'^group_\d+$').hasMatch(term)) continue;
+      if (!terms.any((t) => t.toLowerCase() == term.toLowerCase())) terms.add(term);
+    }
+    if (terms.isEmpty) return const SizedBox.shrink();
+    return _chipRow(
+      sss,
+      'Find mods for',
+      [
+        for (final t in terms)
+          GbPill(
+            label: t,
+            selected: _query.toLowerCase() == t.toLowerCase(),
+            onTap: () {
+              _search.text = t;
+              _runSearch(t);
+              setState(() {});
+            },
           ),
       ],
     );
   }
 
-  Widget _buildBody(double sss, TargetGame game) {
-    if (!gbGameIds.containsKey(game)) {
-      return _Message(
-        'Choose a game first. GameBanana mods are shown for the game NRMM is set to.',
-      );
-    }
-    if (ref.watch(validModsPath) == null) {
-      return _Message(
-        'The Mods folder is not ready yet. Set it up in Settings, then come back.',
-      );
-    }
-    if (_mods.isEmpty) {
-      if (_loading) return const Center(child: CircularProgressIndicator());
-      if (_error != null) {
-        return _Message(_error!, retry: () => _load(reset: true));
-      }
-      if (_started) return _Message('No mods found.');
-      return const SizedBox.shrink();
-    }
-    return Column(
-      children: [
-        Expanded(
-          child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-            child: GridView.builder(
-              controller: _scroll,
-              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 156.816 * sss + 8 * sss,
-                mainAxisExtent: 217.8 * sss + 56 * sss,
-                crossAxisSpacing: 8 * sss,
-                mainAxisSpacing: 12 * sss,
-              ),
-              itemCount: _mods.length,
-              itemBuilder: (context, i) {
-                final mod = _mods[i];
-                final installed = _installed[mod.id];
-                return _GbCard(
-                  mod: mod,
-                  badge:
-                      installed == null
-                          ? null
-                          : hasUpdateForCard(installed, mod)
-                          ? _Badge.update
-                          : _Badge.installed,
-                  onTap: () => _openDetails(mod),
-                );
-              },
-            ),
-          ),
+  Widget _categoryChips(double sss) {
+    if (_categories.isEmpty) return const SizedBox.shrink();
+    return _chipRow(
+      sss,
+      'Category',
+      [
+        GbPill(
+          label: 'All',
+          selected: _query.isEmpty && _categoryId == null,
+          onTap: () => _pickCategory(null),
         ),
-        if (_loading)
-          Padding(
-            padding: EdgeInsets.only(top: 6 * sss),
-            child: SizedBox(
-              height: 16 * sss,
-              width: 16 * sss,
-              child: const CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        if (_error != null)
-          Padding(
-            padding: EdgeInsets.only(top: 6 * sss),
-            child: Text(
-              _error!,
-              style: GoogleFonts.poppins(color: Colors.red, fontSize: 12 * sss),
-            ),
+        for (final c in _categories)
+          GbPill(
+            label: '${c.name}  ${formatCount(c.itemCount)}',
+            selected: _query.isEmpty && _categoryId == c.id,
+            onTap: () => _pickCategory(c.id),
           ),
       ],
     );
   }
-}
 
-class _Chip extends ConsumerWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _Chip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sss = ref.watch(zoomScaleProvider);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 30 * sss,
-          padding: EdgeInsets.symmetric(horizontal: 12 * sss),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? getAccentColor(ref) : _line,
-              width: 3 * sss,
-            ),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            label,
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 11 * sss,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Message extends ConsumerWidget {
-  final String text;
-  final VoidCallback? retry;
-  const _Message(this.text, {this.retry});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sss = ref.watch(zoomScaleProvider);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+  Widget _chipRow(double sss, String label, List<Widget> chips) {
+    return Padding(
+      padding: EdgeInsets.only(top: 6 * sss),
+      child: Row(
         children: [
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 13 * sss),
+          SizedBox(
+            width: 92 * sss,
+            child: Text(label, style: gbText(sss, 11, color: Colors.white60)),
           ),
-          if (retry != null)
-            Padding(
-              padding: EdgeInsets.only(top: 10 * sss),
-              child: _Chip(label: 'Try again', selected: true, onTap: retry!),
+          Expanded(
+            child: SizedBox(
+              height: 32 * sss,
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: chips.length,
+                  separatorBuilder: (_, _) => SizedBox(width: 6 * sss),
+                  itemBuilder: (_, i) => Center(child: chips[i]),
+                ),
+              ),
             ),
+          ),
         ],
       ),
     );
   }
+
+  // ---------- grid ----------
+
+  SliverGridDelegateWithMaxCrossAxisExtent _gridDelegate(double sss) =>
+      SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 156.816 * sss + 8 * sss,
+        mainAxisExtent: 217.8 * sss + 74 * sss,
+        crossAxisSpacing: 8 * sss,
+        mainAxisSpacing: 10 * sss,
+      );
+
+  Widget _body(double sss, TargetGame game) {
+    if (!gbGameIds.containsKey(game)) {
+      return const GbMessage(
+        'Choose a game first. GameBanana mods are shown for the game NRMM is set to.',
+      );
+    }
+    if (ref.watch(validModsPath) == null) {
+      return const GbMessage(
+        'The Mods folder is not ready yet. Set it up in Settings, then come back.',
+      );
+    }
+    if (_error != null) {
+      return GbMessage(_error!, retry: () => _go(_page));
+    }
+    if (_loading || (_mods.isEmpty && !_started)) {
+      return GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: _gridDelegate(sss),
+        itemCount: 10,
+        itemBuilder: (_, _) => const GbSkeletonCard(),
+      );
+    }
+    if (_mods.isEmpty) return const GbMessage('No mods found.');
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: GridView.builder(
+        controller: _scroll,
+        gridDelegate: _gridDelegate(sss),
+        itemCount: _mods.length,
+        itemBuilder: (context, i) {
+          final mod = _mods[i];
+          final installed = _installed[mod.id];
+          return _GbCard(
+            mod: mod,
+            badge:
+                installed == null
+                    ? null
+                    : hasUpdateForCard(installed, mod)
+                    ? _Badge.update
+                    : _Badge.installed,
+            onTap: () => _openDetails(mod),
+          );
+        },
+      ),
+    );
+  }
+
+  // ---------- page bar ----------
+
+  Widget _pager(double sss) {
+    Widget nav(String label, int? target) => GbPill(
+      label: label,
+      compact: true,
+      onTap: target == null || _loading ? null : () => _go(target),
+    );
+
+    final atFirst = _page <= 1;
+    final atLast = _page >= _totalPages;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '${_withCommas(_totalCount)} mods  ·  page $_page of ${_withCommas(_totalPages)}',
+            style: gbText(sss, 11, color: Colors.white60),
+          ),
+        ),
+        nav('«', atFirst ? null : 1),
+        SizedBox(width: 4 * sss),
+        nav('‹', atFirst ? null : _page - 1),
+        SizedBox(width: 4 * sss),
+        for (final n in pageWindow(_page, _totalPages)) ...[
+          if (n == null)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4 * sss),
+              child: Text('…', style: gbText(sss, 12, color: Colors.white60)),
+            )
+          else
+            GbPill(
+              label: '$n',
+              compact: true,
+              selected: n == _page,
+              onTap: n == _page || _loading ? null : () => _go(n),
+            ),
+          SizedBox(width: 4 * sss),
+        ],
+        nav('›', atLast ? null : _page + 1),
+        SizedBox(width: 4 * sss),
+        nav('»', atLast ? null : _totalPages),
+        SizedBox(width: 10 * sss),
+        Container(
+          width: 74 * sss,
+          height: 26 * sss,
+          padding: EdgeInsets.symmetric(horizontal: 10 * sss),
+          decoration: BoxDecoration(
+            border: Border.all(color: gbLine, width: 3 * sss),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: TextField(
+            controller: _jump,
+            style: gbText(sss, 11),
+            cursorColor: getAccentColor(ref),
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isCollapsed: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 5 * sss),
+              hintText: 'Go to…',
+              hintStyle: gbText(sss, 11, color: Colors.white54),
+            ),
+            onSubmitted: (text) {
+              final n = int.tryParse(text.trim());
+              if (n != null) unawaited(_go(n.clamp(1, _totalPages)));
+              _jump.clear();
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }
+
+String _withCommas(int n) => n.toString().replaceAllMapped(
+  RegExp(r'\B(?=(\d{3})+(?!\d))'),
+  (_) => ',',
+);
 
 enum _Badge { installed, update }
 
@@ -420,6 +584,11 @@ class _GbCardState extends ConsumerState<_GbCard> {
   Widget build(BuildContext context) {
     final sss = ref.watch(zoomScaleProvider);
     final mod = widget.mod;
+    final kind =
+        mod.subCategoryName.isNotEmpty ? mod.subCategoryName : mod.categoryName;
+    final age = ageLabel(mod.dateAdded);
+    final line1 = [if (kind.isNotEmpty) kind, if (age.isNotEmpty) age].join('  ·  ');
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -433,7 +602,7 @@ class _GbCardState extends ConsumerState<_GbCard> {
               width: 156.816 * sss,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: _hover ? Colors.white : _line,
+                  color: _hover ? Colors.white : gbLine,
                   width: 3 * sss,
                   strokeAlign: BorderSide.strokeAlignInside,
                 ),
@@ -445,22 +614,8 @@ class _GbCardState extends ConsumerState<_GbCard> {
                   fit: StackFit.expand,
                   children: [
                     mod.thumbUrl == null
-                        ? Icon(
-                          Icons.image_outlined,
-                          size: 40 * sss,
-                          color: _line,
-                        )
-                        : Image.network(
-                          mod.thumbUrl!,
-                          fit: BoxFit.cover,
-                          cacheWidth: 400,
-                          errorBuilder:
-                              (_, _, _) => Icon(
-                                Icons.image_outlined,
-                                size: 40 * sss,
-                                color: _line,
-                              ),
-                        ),
+                        ? Icon(Icons.image_outlined, size: 40 * sss, color: gbLine)
+                        : GbNetworkImage(mod.thumbUrl!, cacheWidth: 400),
                     if (widget.badge != null)
                       Positioned(
                         left: 6 * sss,
@@ -475,12 +630,11 @@ class _GbCardState extends ConsumerState<_GbCard> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            widget.badge == _Badge.update
-                                ? 'Update'
-                                : 'Installed',
-                            style: GoogleFonts.poppins(
-                              fontSize: 10 * sss,
-                              fontWeight: FontWeight.w600,
+                            widget.badge == _Badge.update ? 'Update' : 'Installed',
+                            style: gbText(
+                              sss,
+                              10,
+                              weight: FontWeight.w600,
                               color:
                                   widget.badge == _Badge.update
                                       ? Colors.orangeAccent
@@ -499,393 +653,24 @@ class _GbCardState extends ConsumerState<_GbCard> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 11 * sss,
-                fontWeight: FontWeight.w500,
-              ),
+              style: gbText(sss, 11, weight: FontWeight.w500),
             ),
+            if (line1.isNotEmpty)
+              Text(
+                line1,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: gbText(sss, 10, color: Colors.white60),
+              ),
             Text(
-              '${mod.authorName}  ♥ ${mod.likeCount}',
+              '${mod.authorName}  ♥ ${formatCount(mod.likeCount)}  ·  ${formatCount(mod.viewCount)} views',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(
-                color: Colors.white60,
-                fontSize: 10 * sss,
-              ),
+              style: gbText(sss, 10, color: Colors.white54),
             ),
           ],
         ),
       ),
     );
   }
-}
-
-class _GbDetailsDialog extends ConsumerStatefulWidget {
-  final GbMod mod;
-  final InstalledGbMod? installed;
-  final String modsPath;
-  const _GbDetailsDialog({
-    required this.mod,
-    required this.installed,
-    required this.modsPath,
-  });
-
-  @override
-  ConsumerState<_GbDetailsDialog> createState() => _GbDetailsDialogState();
-}
-
-class _GbDetailsDialogState extends ConsumerState<_GbDetailsDialog> {
-  GbModDetails? _details;
-  String? _loadError;
-  GbFile? _file;
-  String _target = ''; // a group path, or _newGroup
-  static const _newGroup = '::new::';
-  int _image = 0;
-  bool _busy = false;
-  String _status = '';
-  bool _done = false;
-  String? _failed;
-
-  @override
-  void initState() {
-    super.initState();
-    final groups = ref.read(modGroupDataProvider);
-    final current = ref.read(currentGroupIndexProvider);
-    if (groups.isNotEmpty) {
-      _target = groups[current.clamp(0, groups.length - 1)].groupPath;
-    } else {
-      _target = _newGroup;
-    }
-    _api
-        .details(widget.mod.id)
-        .then((d) {
-          if (!mounted) return;
-          setState(() {
-            _details = d;
-            _file = d.newestFile;
-          });
-        })
-        .catchError((Object e) {
-          if (mounted) {
-            setState(() => _loadError = e is GbException ? e.message : '$e');
-          }
-        });
-  }
-
-  bool get _isUpdate =>
-      widget.installed != null &&
-      _details != null &&
-      hasUpdateExact(widget.installed!.source, _details!);
-
-  String? get _blockReason {
-    final d = _details;
-    final f = _file;
-    if (d == null) return null;
-    if (d.isBlocked) return 'This mod is withheld or removed on GameBanana.';
-    if (f == null) return 'This mod has no files to download.';
-    if (!f.isClean) {
-      return 'GameBanana\'s virus scan did not mark this file clean.';
-    }
-    return null;
-  }
-
-  Future<void> _run() async {
-    final details = _details!;
-    final file = _file!;
-    setState(() {
-      _busy = true;
-      _failed = null;
-      _status = 'Starting…';
-    });
-    try {
-      final temp = p.join((await getTemporaryDirectory()).path, 'nrmm_gb');
-      void say(String s) {
-        if (mounted) setState(() => _status = s);
-      }
-
-      if (_isUpdate) {
-        await updateMod(
-          client: httpClient.client,
-          details: details,
-          file: file,
-          existingModPath: widget.installed!.modPath,
-          backupRoot: p.join(p.dirname(widget.modsPath), 'NRMM_GB_Backups'),
-          tempRoot: temp,
-          extract: _sevenZipExtract,
-          carryOverFiles: _carryOver,
-          onStatus: say,
-        );
-      } else {
-        var groupPath = _target;
-        if (groupPath == _newGroup) {
-          final index = await addGroup(ref, _managedPath(widget.modsPath));
-          groupPath = ref.read(modGroupDataProvider)[(index ?? 1) - 1].groupPath;
-        }
-        await installFile(
-          client: httpClient.client,
-          details: details,
-          file: file,
-          groupPath: groupPath,
-          tempRoot: temp,
-          extract: _sevenZipExtract,
-          onStatus: say,
-        );
-      }
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _done = true;
-        });
-      }
-    } on GbException catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _failed = e.message;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _failed = 'Something went wrong: $e';
-        });
-      }
-    }
-  }
-
-  void _close() => Navigator.of(context).pop();
-
-  @override
-  Widget build(BuildContext context) {
-    final sss = ref.watch(zoomScaleProvider);
-    final accent = getAccentColor(ref);
-    final d = _details;
-
-    TextStyle t(double size, {FontWeight w = FontWeight.w400, Color? c}) =>
-        GoogleFonts.poppins(
-          fontSize: size * sss,
-          fontWeight: w,
-          color: c ?? Colors.white,
-        );
-
-    Widget body;
-    if (_loadError != null) {
-      body = Text(_loadError!, style: t(12, c: Colors.red));
-    } else if (d == null) {
-      body = const Center(child: CircularProgressIndicator());
-    } else {
-      body = Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 230 * sss, child: _pictures(d, sss)),
-          SizedBox(width: 20 * sss),
-          Expanded(child: _infoColumn(d, sss, accent, t)),
-        ],
-      );
-    }
-
-    return Stack(
-      children: [
-        MoveWindow(),
-        AlertDialog(
-          backgroundColor: _dialogColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(widget.mod.name, style: t(16, w: FontWeight.w600)),
-          content: SizedBox(
-            width: 680 * sss,
-            height: 340 * sss,
-            child: body,
-          ),
-          actions: [
-            TextButton(
-              onPressed: _busy ? null : _close,
-              child: Text(_done ? 'Close' : 'Cancel', style: t(13, c: accent)),
-            ),
-            if (!_done && d != null)
-              TextButton(
-                onPressed:
-                    _busy || _blockReason != null || _file == null ? null : _run,
-                child: Text(
-                  _isUpdate ? 'Update' : 'Download',
-                  style: t(13, w: FontWeight.w600, c: accent),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _pictures(GbModDetails d, double sss) {
-    if (d.images.isEmpty) {
-      return Container(
-        height: 300 * sss,
-        decoration: BoxDecoration(
-          border: Border.all(color: _line, width: 3 * sss),
-          borderRadius: BorderRadius.circular(17 * sss),
-        ),
-        child: Icon(Icons.image_outlined, size: 40 * sss, color: _line),
-      );
-    }
-    return Column(
-      children: [
-        Container(
-          height: 250 * sss,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            border: Border.all(color: _line, width: 3 * sss),
-            borderRadius: BorderRadius.circular(17 * sss),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14 * sss),
-            child: Image.network(
-              d.images[_image.clamp(0, d.images.length - 1)],
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          ),
-        ),
-        SizedBox(height: 6 * sss),
-        SizedBox(
-          height: 40 * sss,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              for (var i = 0; i < d.images.length; i++)
-                GestureDetector(
-                  onTap: () => setState(() => _image = i),
-                  child: Container(
-                    width: 50 * sss,
-                    margin: EdgeInsets.only(right: 6 * sss),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: i == _image ? getAccentColor(ref) : _line,
-                        width: 2 * sss,
-                      ),
-                      borderRadius: BorderRadius.circular(8 * sss),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(6 * sss),
-                      child: Image.network(
-                        d.images[i],
-                        fit: BoxFit.cover,
-                        cacheWidth: 120,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _infoColumn(
-    GbModDetails d,
-    double sss,
-    Color accent,
-    TextStyle Function(double, {FontWeight w, Color? c}) t,
-  ) {
-    final groups = ref.watch(modGroupDataProvider);
-    final installed = widget.installed;
-    final reason = _blockReason;
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'by ${d.mod.authorName}  ·  ♥ ${widget.mod.likeCount}',
-            style: t(11, c: Colors.white60),
-          ),
-          SizedBox(height: 10 * sss),
-          Text(_plainText(d.descriptionHtml), maxLines: 7, overflow: TextOverflow.ellipsis, style: t(11)),
-          SizedBox(height: 12 * sss),
-          Text('Files', style: t(11, c: Colors.white60)),
-          for (final f in d.files)
-            InkWell(
-              onTap: _busy || _done ? null : () => setState(() => _file = f),
-              child: Row(
-                children: [
-                  Icon(
-                    f.id == _file?.id
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    size: 16 * sss,
-                    color: f.id == _file?.id ? accent : Colors.white54,
-                  ),
-                  SizedBox(width: 6 * sss),
-                  Expanded(
-                    child: Text(
-                      f.fileName,
-                      overflow: TextOverflow.ellipsis,
-                      style: t(11),
-                    ),
-                  ),
-                  Text(_size(f.size), style: t(10, c: Colors.white60)),
-                ],
-              ),
-            ),
-          SizedBox(height: 12 * sss),
-          if (installed != null)
-            Text(
-              _isUpdate
-                  ? 'You have an older version. Update replaces it and keeps a backup.'
-                  : 'You already have the latest version.',
-              style: t(11, c: _isUpdate ? Colors.orangeAccent : Colors.lightGreenAccent),
-            )
-          else ...[
-            Text('Put it in', style: t(11, c: Colors.white60)),
-            DropdownButton<String>(
-              isExpanded: true,
-              dropdownColor: _dialogColor,
-              value: groups.any((g) => g.groupPath == _target) || _target == _newGroup
-                  ? _target
-                  : _newGroup,
-              onChanged: _busy || _done ? null : (v) => setState(() => _target = v!),
-              items: [
-                for (final g in groups)
-                  DropdownMenuItem(
-                    value: g.groupPath,
-                    child: Text(g.groupName, style: t(12)),
-                  ),
-                DropdownMenuItem(value: _newGroup, child: Text('New group', style: t(12))),
-              ],
-            ),
-          ],
-          if (reason != null) Text(reason, style: t(11, c: Colors.red)),
-          if (_busy) Text(_status, style: t(11, c: accent)),
-          if (_failed != null) Text(_failed!, style: t(11, c: Colors.red)),
-          if (_done)
-            Text(
-              'Done. Run Update Mod Data so NRMM can set the mod up.',
-              style: t(11, w: FontWeight.w600, c: Colors.lightGreenAccent),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-String _size(int bytes) {
-  if (bytes >= 1024 * 1024) return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
-  return '${(bytes / 1024).ceil()} KB';
-}
-
-/// GameBanana descriptions are HTML. This keeps the words and drops the tags.
-String _plainText(String html) {
-  return html
-      .replaceAll(RegExp(r'<br\s*/?>|</p>|</li>|</h\d>', caseSensitive: false), '\n')
-      .replaceAll(RegExp(r'<[^>]*>'), '')
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&amp;', '&')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#039;', "'")
-      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-      .trim();
 }

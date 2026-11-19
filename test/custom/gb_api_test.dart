@@ -169,6 +169,16 @@ void main() {
     expect(page(13254).totalPages, 663);
   });
 
+  test('page count uses the page size the server really used', () async {
+    // Search ignores our 20 and answers 15 per page.
+    const body =
+        '{"_aMetadata":{"_nRecordCount":105,"_nPerpage":15},"_aRecords":[{"_idRow":1,"_sName":"a"}]}';
+    final page = await _apiReturning(body).search(gameId: 1, query: 'x', page: 2);
+    expect(page.perPage, 15);
+    expect(page.totalPages, 7);
+    expect(page.hasMore, true);
+  });
+
   test('details carry credits, license, requirements, counts and category', () async {
     final d = await _apiReturning(_fixture('profile.json')).details(736306);
     expect(d.categoryName, 'UI');

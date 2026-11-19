@@ -513,7 +513,7 @@ class _BackgroundState extends ConsumerState<Background> {
                                 },
                                 label: 'Add group'.tr(),
                               ),
-                            if (ref.watch(tabIndexProvider) != 2)
+                            if (ref.watch(tabIndexProvider) != 3)
                               CustomMenuItem(
                                 scale: sss,
                                 onSelected: () async {
@@ -678,7 +678,7 @@ class _MainViewState extends ConsumerState<MainView>
         tray.TrayListener {
   late TabController _tabController;
 
-  List<Widget> _views = [TabKeybinds(), TabModsLoading(), TabSettings(), TabGameBanana()];
+  List<Widget> _views = [TabKeybinds(), TabModsLoading(), TabGameBanana(), TabSettings()];
 
   @override
   void onWindowBlur() {
@@ -1494,7 +1494,7 @@ class _MainViewState extends ConsumerState<MainView>
     ref.read(searchBarShownProvider.notifier).state = false;
 
     setState(() {
-      _views = [TabKeybinds(), TabModsLoading(), TabSettings(), TabGameBanana()];
+      _views = [TabKeybinds(), TabModsLoading(), TabGameBanana(), TabSettings()];
     });
     TargetGame targetGame = ref.read(targetGameProvider);
     if (targetGame == TargetGame.none) return;
@@ -1612,14 +1612,14 @@ class _MainViewState extends ConsumerState<MainView>
           ? _views = [
             TabKeybinds(),
             TabMods(),
-            TabSettings(),
             TabGameBanana(),
+            TabSettings(),
           ]
           : _views = [
             TabKeybinds(),
             TabModsNotReady(notReadyReason: notReadyReason),
-            TabSettings(),
             TabGameBanana(),
+            TabSettings(),
           ];
     });
   }
@@ -1810,8 +1810,8 @@ class _MainViewState extends ConsumerState<MainView>
                       tabs: [
                         SegmentTab(label: "Keybinds".tr()),
                         SegmentTab(label: "Mods".tr()),
-                        SegmentTab(label: "Settings".tr()),
                         SegmentTab(label: "GameBanana"),
+                        SegmentTab(label: "Settings".tr()),
                       ],
                     ),
                   ),
