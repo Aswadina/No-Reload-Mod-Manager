@@ -10,7 +10,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-const int gbPerPage = 15;
+const int gbPerPage = 20;
 
 enum GbSort {
   newest('Generic_Newest', 'Newest'),
@@ -42,6 +42,10 @@ class GbMod {
   final String? thumbUrl;
   final int? dateAdded;
   final int? dateUpdated;
+  final String categoryName;
+  final String subCategoryName;
+  final int viewCount;
+  final List<String> tags;
 
   const GbMod({
     required this.id,
@@ -53,6 +57,10 @@ class GbMod {
     required this.thumbUrl,
     required this.dateAdded,
     required this.dateUpdated,
+    this.categoryName = '',
+    this.subCategoryName = '',
+    this.viewCount = 0,
+    this.tags = const [],
   });
 
   factory GbMod.fromJson(Map<String, dynamic> j) {
@@ -67,8 +75,38 @@ class GbMod {
       thumbUrl: images.isEmpty ? null : images.first,
       dateAdded: _int(j['_tsDateAdded']),
       dateUpdated: _int(j['_tsDateUpdated']),
+      // Browse records name the category in _aRootCategory; a mod page in _aCategory.
+      categoryName: _str(
+        ((j['_aRootCategory'] ?? j['_aCategory']) as Map?)?['_sName'],
+      ),
+      subCategoryName: _str((j['_aSubCategory'] as Map?)?['_sName']),
+      viewCount: _int(j['_nViewCount']) ?? 0,
+      tags: _tags(j['_aTags']),
     );
   }
+}
+
+class GbCategory {
+  final int id;
+  final String name;
+  final int itemCount;
+  const GbCategory({
+    required this.id,
+    required this.name,
+    required this.itemCount,
+  });
+}
+
+class GbCreditGroup {
+  final String name;
+  final List<String> people;
+  const GbCreditGroup({required this.name, required this.people});
+}
+
+class GbRequirement {
+  final String name;
+  final String url;
+  const GbRequirement({required this.name, required this.url});
 }
 
 class GbPage {
@@ -82,6 +120,7 @@ class GbPage {
   });
 
   bool get hasMore => page * gbPerPage < totalCount;
+  int get totalPages => (totalCount / gbPerPage).ceil();
 }
 
 class GbFile {
@@ -124,6 +163,16 @@ class GbModDetails {
   final List<String> images;
   final String descriptionHtml;
   final bool isBlocked;
+  final List<String> tags;
+  final List<GbCreditGroup> credits;
+  final List<GbRequirement> requirements;
+
+  /// "yes" / "ask" / "no" -> what the author allows.
+  final Map<String, List<String>> license;
+  final int downloadCount;
+  final int viewCount;
+  final int likeCount;
+  final String categoryName;
 
   const GbModDetails({
     required this.mod,
@@ -131,6 +180,14 @@ class GbModDetails {
     required this.images,
     required this.descriptionHtml,
     required this.isBlocked,
+    this.tags = const [],
+    this.credits = const [],
+    this.requirements = const [],
+    this.license = const {},
+    this.downloadCount = 0,
+    this.viewCount = 0,
+    this.likeCount = 0,
+    this.categoryName = '',
   });
 
   /// Newest file first, as GameBanana lists them.
@@ -145,16 +202,41 @@ class GbApi {
     required int gameId,
     required int page,
     required GbSort sort,
+    int? categoryId,
   }) async {
     final json = await _get(
       Uri.https('gamebanana.com', '/apiv11/Mod/Index', {
         '_nPerpage': '$gbPerPage',
         '_nPage': '$page',
         '_aFilters[Generic_Game]': '$gameId',
+        if (categoryId != null) '_aFilters[Generic_Category]': '$categoryId',
         '_sSort': sort.apiValue,
       }),
     );
     return _page(json, page);
+  }
+
+  /// The game's top-level mod categories (Skins, UI, ...), with counts.
+  Future<List<GbCategory>> categories(int gameId) async {
+    final json = await _getJson(
+      Uri.https('gamebanana.com', '/apiv11/Mod/Categories', {
+        '_idGameRow': '$gameId',
+        '_sSort': 'a_to_z',
+        '_bShowEmpty': 'false',
+      }),
+    );
+    if (json is! List) {
+      throw GbException('GameBanana sent something we could not read.');
+    }
+    return [
+      for (final c in json)
+        if (c is Map && _int(c['_idRow']) != null)
+          GbCategory(
+            id: _int(c['_idRow'])!,
+            name: _str(c['_sName']),
+            itemCount: _int(c['_nItemCount']) ?? 0,
+          ),
+    ];
   }
 
   Future<GbPage> search({
@@ -190,6 +272,39 @@ class GbApi {
           j['_bIsWithheld'] == true ||
           j['_bIsTrashed'] == true ||
           j['_bIsPrivate'] == true,
+      tags: _tags(j['_aTags']),
+      credits: [
+        for (final g in (j['_aCredits'] as List? ?? []))
+          if (g is Map)
+            GbCreditGroup(
+              name: _str(g['_sGroupName']),
+              people: [
+                for (final a in (g['_aAuthors'] as List? ?? []))
+                  if (a is Map && _str(a['_sName']).isNotEmpty)
+                    _str(a['_sRole']).isEmpty
+                        ? _str(a['_sName'])
+                        : '${_str(a['_sName'])} (${_str(a['_sRole'])})',
+              ],
+            ),
+      ],
+      requirements: [
+        for (final r in (j['_aRequirements'] as List? ?? []))
+          if (r is List && r.isNotEmpty)
+            GbRequirement(
+              name: _str(r[0]),
+              url: r.length > 1 ? _str(r[1]) : '',
+            ),
+      ],
+      license: {
+        if (j['_aLicenseChecklist'] is Map)
+          for (final e in (j['_aLicenseChecklist'] as Map).entries)
+            if (e.value is List)
+              '${e.key}': [for (final x in e.value as List) if (x is String) x],
+      },
+      downloadCount: _int(j['_nDownloadCount']) ?? 0,
+      viewCount: _int(j['_nViewCount']) ?? 0,
+      likeCount: _int(j['_nLikeCount']) ?? 0,
+      categoryName: _str((j['_aCategory'] as Map?)?['_sName']),
     );
   }
 
@@ -206,6 +321,12 @@ class GbApi {
   }
 
   Future<Map<String, dynamic>> _get(Uri url) async {
+    final decoded = await _getJson(url);
+    if (decoded is Map<String, dynamic>) return decoded;
+    throw GbException('GameBanana sent something we could not read.');
+  }
+
+  Future<Object?> _getJson(Uri url) async {
     final http.Response response;
     try {
       response = await _client
@@ -239,14 +360,24 @@ class GbApi {
       );
     }
     try {
-      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      if (decoded is Map<String, dynamic>) return decoded;
-    } catch (_) {}
-    throw GbException('GameBanana sent something we could not read.');
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } catch (_) {
+      throw GbException('GameBanana sent something we could not read.');
+    }
   }
 }
 
 String _str(Object? v) => v is String ? v : '';
+
+/// Tags come as plain strings or as {_sValue: ...} objects.
+List<String> _tags(Object? v) => [
+  if (v is List)
+    for (final t in v)
+      if (t is String && t.isNotEmpty)
+        t
+      else if (t is Map && _str(t['_sValue']).isNotEmpty)
+        _str(t['_sValue']),
+];
 
 int? _int(Object? v) =>
     v is int ? v : (v is String ? int.tryParse(v) : (v is num ? v.toInt() : null));
