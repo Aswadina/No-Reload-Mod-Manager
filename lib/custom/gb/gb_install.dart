@@ -24,6 +24,7 @@ Future<String> installFile({
   required String tempRoot,
   required GbExtract extract,
   void Function(String status)? onStatus,
+  void Function(int received, int total)? onProgress,
 }) async {
   final workDir = await _newWorkDir(tempRoot, file.id);
   try {
@@ -34,6 +35,7 @@ Future<String> installFile({
       fallbackName: _safeName(details.mod.name),
       extract: extract,
       onStatus: onStatus,
+      onProgress: onProgress,
     );
     onStatus?.call('Adding to your group…');
     final path = await moveFolderInto(staged, groupPath);
@@ -58,6 +60,7 @@ Future<String> updateMod({
   required GbExtract extract,
   List<String> carryOverFiles = const [],
   void Function(String status)? onStatus,
+  void Function(int received, int total)? onProgress,
 }) async {
   final workDir = await _newWorkDir(tempRoot, file.id);
   try {
@@ -70,6 +73,7 @@ Future<String> updateMod({
       forceName: oldName,
       extract: extract,
       onStatus: onStatus,
+      onProgress: onProgress,
     );
 
     onStatus?.call('Swapping in the new version…');
@@ -131,6 +135,7 @@ Future<String> _fetchAndStage({
   String? forceName,
   required GbExtract extract,
   void Function(String status)? onStatus,
+  void Function(int received, int total)? onProgress,
 }) async {
   final archive = p.join(workDir, _safeFileName(file.fileName));
 
@@ -147,7 +152,18 @@ Future<String> _fetchAndStage({
       statusCode: response.statusCode,
     );
   }
-  await response.stream.pipe(File(archive).openWrite());
+  final sink = File(archive).openWrite();
+  var received = 0;
+  final total = response.contentLength ?? file.size;
+  try {
+    await for (final chunk in response.stream) {
+      sink.add(chunk);
+      received += chunk.length;
+      onProgress?.call(received, total);
+    }
+  } finally {
+    await sink.close();
+  }
 
   if (file.md5.isNotEmpty) {
     onStatus?.call('Checking the download…');

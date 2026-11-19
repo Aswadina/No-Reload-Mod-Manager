@@ -172,6 +172,11 @@ void main() {
   test('details carry credits, license, requirements, counts and category', () async {
     final d = await _apiReturning(_fixture('profile.json')).details(736306);
     expect(d.categoryName, 'UI');
+    expect(
+      d.fullImages.first,
+      'https://images.gamebanana.com/img/ss/mods/6aeb61e72723d.jpg',
+    );
+    expect(d.images.first, contains('530-90_6aeb61e72723d.jpg'));
     expect(d.downloadCount, 14);
     expect(d.viewCount, 150);
     expect(d.likeCount, 10);

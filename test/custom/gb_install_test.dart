@@ -93,6 +93,23 @@ void main() {
     );
   }
 
+  test('reports download progress up to the full size', () async {
+    final seen = <(int, int)>[];
+    final f = file();
+    await installFile(
+      client: client(),
+      details: details(f),
+      file: f,
+      groupPath: group,
+      tempRoot: temp,
+      extract: fakeExtract({'CoolMod/main.ini': 'x'}),
+      onProgress: (got, total) => seen.add((got, total)),
+    );
+    expect(seen, isNotEmpty);
+    expect(seen.last.$1, bytes.length);
+    expect(seen.last.$2, bytes.length);
+  });
+
   test('single wrapper folder becomes the mod folder', () async {
     final path = await install({'CoolMod/main.ini': 'x', 'CoolMod/a.dds': 'y'});
     expect(p.basename(path), 'CoolMod');

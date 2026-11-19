@@ -161,6 +161,9 @@ class GbModDetails {
   final GbMod mod;
   final List<GbFile> files;
   final List<String> images;
+
+  /// Same pictures at full size, for the big viewer.
+  final List<String> fullImages;
   final String descriptionHtml;
   final bool isBlocked;
   final List<String> tags;
@@ -180,6 +183,7 @@ class GbModDetails {
     required this.images,
     required this.descriptionHtml,
     required this.isBlocked,
+    this.fullImages = const [],
     this.tags = const [],
     this.credits = const [],
     this.requirements = const [],
@@ -267,6 +271,7 @@ class GbApi {
           if (f is Map<String, dynamic>) GbFile.fromJson(f),
       ],
       images: _imageUrls(j['_aPreviewMedia']),
+      fullImages: _imageUrls(j['_aPreviewMedia'], full: true),
       descriptionHtml: _str(j['_sText']),
       isBlocked:
           j['_bIsWithheld'] == true ||
@@ -383,18 +388,18 @@ int? _int(Object? v) =>
     v is int ? v : (v is String ? int.tryParse(v) : (v is num ? v.toInt() : null));
 
 /// Picture urls, medium size when GameBanana has one.
-List<String> _imageUrls(Object? previewMedia) {
+List<String> _imageUrls(Object? previewMedia, {bool full = false}) {
   final images = previewMedia is Map ? previewMedia['_aImages'] : null;
   if (images is! List) return [];
   final urls = <String>[];
   for (final img in images) {
     if (img is! Map) continue;
     final base = _str(img['_sBaseUrl']);
-    final file = [
-      _str(img['_sFile530']),
-      _str(img['_sFile220']),
-      _str(img['_sFile']),
-    ].firstWhere((f) => f.isNotEmpty, orElse: () => '');
+    final candidates =
+        full
+            ? [_str(img['_sFile']), _str(img['_sFile530']), _str(img['_sFile220'])]
+            : [_str(img['_sFile530']), _str(img['_sFile220']), _str(img['_sFile'])];
+    final file = candidates.firstWhere((f) => f.isNotEmpty, orElse: () => '');
     if (base.isNotEmpty && file.isNotEmpty) urls.add('$base/$file');
   }
   return urls;
