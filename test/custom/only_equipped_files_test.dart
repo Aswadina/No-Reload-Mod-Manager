@@ -40,21 +40,23 @@ void main() {
       expect(exists('ModA/tex.dds'), isTrue);
     });
 
-    test('leaves inis the author disabled, and disabled folders, alone',
-        () async {
-      await touch('ModA/DISABLED_variant.ini');
-      await touch('ModA/disabledOther.ini');
-      await touch('ModA/DISABLED_folder/inner.ini');
-      await touch('ModA/desktop.ini');
+    test(
+      'leaves inis the author disabled, and disabled folders, alone',
+      () async {
+        await touch('ModA/DISABLED_variant.ini');
+        await touch('ModA/disabledOther.ini');
+        await touch('ModA/DISABLED_folder/inner.ini');
+        await touch('ModA/desktop.ini');
 
-      final count = await hideModInis(p.join(tmp.path, 'ModA'));
+        final count = await hideModInis(p.join(tmp.path, 'ModA'));
 
-      expect(count, 0);
-      expect(exists('ModA/DISABLED_variant.ini'), isTrue);
-      expect(exists('ModA/disabledOther.ini'), isTrue);
-      expect(exists('ModA/DISABLED_folder/inner.ini'), isTrue);
-      expect(exists('ModA/desktop.ini'), isTrue);
-    });
+        expect(count, 0);
+        expect(exists('ModA/DISABLED_variant.ini'), isTrue);
+        expect(exists('ModA/disabledOther.ini'), isTrue);
+        expect(exists('ModA/DISABLED_folder/inner.ini'), isTrue);
+        expect(exists('ModA/desktop.ini'), isTrue);
+      },
+    );
 
     test('unhide only restores our own prefix', () async {
       await touch('ModA/DISABLED_NRMM_main.ini');
@@ -133,8 +135,11 @@ void main() {
 
     test('switching equipped mod swaps which one is hidden', () async {
       await makeGroup();
-      await applyGroupVisibility(group(),
-          onlyEquipped: true, equippedFolder: 'ModB');
+      await applyGroupVisibility(
+        group(),
+        onlyEquipped: true,
+        equippedFolder: 'ModB',
+      );
 
       final changed = await applyGroupVisibility(
         group(),
@@ -150,7 +155,11 @@ void main() {
     test('equipped "none" hides every mod', () async {
       await makeGroup();
 
-      await applyGroupVisibility(group(), onlyEquipped: true, equippedFolder: '');
+      await applyGroupVisibility(
+        group(),
+        onlyEquipped: true,
+        equippedFolder: '',
+      );
 
       expect(exists('group_1/ModA/DISABLED_NRMM_a.ini'), isTrue);
       expect(exists('group_1/ModB/DISABLED_NRMM_b.ini'), isTrue);
@@ -158,7 +167,11 @@ void main() {
 
     test('load all: un-hides everything', () async {
       await makeGroup();
-      await applyGroupVisibility(group(), onlyEquipped: true, equippedFolder: '');
+      await applyGroupVisibility(
+        group(),
+        onlyEquipped: true,
+        equippedFolder: '',
+      );
 
       final changed = await applyGroupVisibility(
         group(),
@@ -173,8 +186,11 @@ void main() {
 
     test('no change means zero renames (so no F10 needed)', () async {
       await makeGroup();
-      await applyGroupVisibility(group(),
-          onlyEquipped: true, equippedFolder: 'ModA');
+      await applyGroupVisibility(
+        group(),
+        onlyEquipped: true,
+        equippedFolder: 'ModA',
+      );
 
       final changed = await applyGroupVisibility(
         group(),
@@ -209,20 +225,24 @@ void main() {
       expect(await readGroupLoadMode(tmp.path), GroupLoadMode.inherit);
     });
 
-    test('equipped mod: missing is null, none is empty, name round trips',
-        () async {
-      expect(await readEquippedMod(tmp.path), isNull);
-      await writeEquippedMod(tmp.path, '');
-      expect(await readEquippedMod(tmp.path), '');
-      await writeEquippedMod(tmp.path, 'Some Mod');
-      expect(await readEquippedMod(tmp.path), 'Some Mod');
-    });
+    test(
+      'equipped mod: missing is null, none is empty, name round trips',
+      () async {
+        expect(await readEquippedMod(tmp.path), isNull);
+        await writeEquippedMod(tmp.path, '');
+        expect(await readEquippedMod(tmp.path), '');
+        await writeEquippedMod(tmp.path, 'Some Mod');
+        expect(await readEquippedMod(tmp.path), 'Some Mod');
+      },
+    );
 
     test('isOnlyEquipped resolves overrides against the global default', () {
       expect(isOnlyEquipped(GroupLoadMode.inherit, globalOn: true), isTrue);
       expect(isOnlyEquipped(GroupLoadMode.inherit, globalOn: false), isFalse);
-      expect(isOnlyEquipped(GroupLoadMode.onlyEquipped, globalOn: false),
-          isTrue);
+      expect(
+        isOnlyEquipped(GroupLoadMode.onlyEquipped, globalOn: false),
+        isTrue,
+      );
       expect(isOnlyEquipped(GroupLoadMode.loadAll, globalOn: true), isFalse);
     });
   });

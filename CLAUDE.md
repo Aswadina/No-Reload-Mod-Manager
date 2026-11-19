@@ -30,13 +30,23 @@ never equal to a real group number), `uistate` (last on/off sent). The hook in
 ## GameBanana tab (personal feature)
 
 Code: `lib/custom/gb/`. Design: `docs/superpowers/specs/2026-11-04-gamebanana-design.md`.
+UX overhaul plan: `docs/superpowers/plans/2026-11-19-gamebanana-ux-overhaul.md`.
 
-Fourth tab (after Settings) to browse/search/download/update mods. `gb_api.dart` is the only
-file that knows GameBanana's JSON. Each downloaded mod gets a `gbsource.json` in its folder
-(mod id, file id, dates) so NRMM can show Installed/Update. Updates move the old folder to
-`<game folder>\NRMM_GB_Backups` (never deleted). Upstream edits are in `lib/main.dart` only
-(tab list, tab count, tab bar width, the E key limit). GameBanana's rate limits are unknown, so
-keep requests few: 15 per page, no polling.
+Tab order is Keybinds 0, Mods 1, **GameBanana 2**, Settings 3. Upstream spots that depend on
+the numbers: `lib/main.dart` (tab lists, tab count, bar width, a `!= 3` Settings check, the E
+key limit) and `lib/tabs/settings_tab.dart` (four `== 3` checks). After an upstream merge, check
+that these still say 3 for Settings.
+
+Files: `gb_api.dart` is the only file that knows GameBanana's JSON; `gb_install.dart` downloads,
+checks (MD5), unpacks and places or swaps a mod; `gb_source.dart` keeps a `gbsource.json` in each
+downloaded mod (mod id, file id, dates) for Installed/Update; `gb_tab.dart` is the browse screen
+(search, category / "find mods for" / sort drop-downs, page bar), `gb_details_dialog.dart` the big
+details dialog, `gb_group_picker.dart` the "Put it in" picker, `gb_image_viewer.dart` the
+full-screen picture viewer. After a download NRMM opens the Update Mod Data dialog by itself.
+Updates move the old folder to `<game folder>/NRMM_GB_Backups` (never deleted). GameBanana's rate
+limits are unknown: 20 per page (search gives 15), no polling, pages cached per session.
+Tests: `test/custom/gb_*_test.dart` (recorded API data in `test/fixtures/gb/`); the render test
+checks the screens at 750x412, 1000x700 and 1500x900.
 
 ## The self-update job
 

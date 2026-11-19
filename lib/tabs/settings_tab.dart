@@ -221,7 +221,7 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
                         ),
                         child: Stack(
                           children: [
-                            if (ref.watch(tabIndexProvider) == 2 &&
+                            if (ref.watch(tabIndexProvider) == 3 &&
                                 !ref.watch(alertDialogShownProvider))
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(20 * sss),
@@ -632,7 +632,7 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
                               ),
                               child: Center(
                                 child:
-                                    ref.watch(tabIndexProvider) == 2
+                                    ref.watch(tabIndexProvider) == 3
                                         ? DropdownButton(
                                           isExpanded: true,
                                           value: ref.watch(
@@ -737,7 +737,7 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
                               ),
                               child: Center(
                                 child:
-                                    ref.watch(tabIndexProvider) == 2
+                                    ref.watch(tabIndexProvider) == 3
                                         ? DropdownButton(
                                           isExpanded: true,
                                           value: ref.watch(
@@ -965,7 +965,7 @@ class _TabSettingsState extends ConsumerState<TabSettings> {
                         ),
                         child: Center(
                           child:
-                              ref.watch(tabIndexProvider) == 2
+                              ref.watch(tabIndexProvider) == 3
                                   ? DropdownButton(
                                     isExpanded: true,
                                     value: context.locale,

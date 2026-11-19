@@ -88,15 +88,18 @@ CustomMenuItem uiGroupMenu(WidgetRef ref, String groupPath, double scale) {
     scale: scale,
     label: 'UI group (several mods on)',
     leftIcon: current ? Icons.check_box : Icons.check_box_outline_blank,
-    onSelected: () async {
-      final invalidate = ref.invalidate;
-      await setUiGroupFolder(groupPath, !current);
-      // A UI group must load every mod; "only equipped" would hide the others.
-      await writeGroupLoadMode(
-        groupPath,
-        current ? GroupLoadMode.inherit : GroupLoadMode.loadAll,
-      );
-      invalidate(uiGroupProvider(groupPath));
-    },
+    onSelected: () => setUiGroup(ref, groupPath, !current),
   );
+}
+
+/// Turns a group into a UI group (or back into a normal one).
+Future<void> setUiGroup(WidgetRef ref, String groupPath, bool on) async {
+  final invalidate = ref.invalidate;
+  await setUiGroupFolder(groupPath, on);
+  // A UI group must load every mod; "only equipped" would hide the others.
+  await writeGroupLoadMode(
+    groupPath,
+    on ? GroupLoadMode.loadAll : GroupLoadMode.inherit,
+  );
+  invalidate(uiGroupProvider(groupPath));
 }

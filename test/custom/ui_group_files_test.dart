@@ -86,8 +86,8 @@ void main() {
   });
 
   test('renderUiGroupIni fills both placeholders', () {
-    final template = File('assets/template_txt/template_group.txt')
-        .readAsStringSync();
+    final template =
+        File('assets/template_txt/template_group.txt').readAsStringSync();
     final out = renderUiGroupIni(template, 7);
     expect(out, contains(r'namespace = modmanageragl\group_7'));
     expect(out, contains(r'global $group_id = 7'));
