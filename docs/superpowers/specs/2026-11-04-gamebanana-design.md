@@ -90,9 +90,9 @@ Not checked yet: how mods behind a content warning behave; the exact category fi
 
 ## Changes made while building (rulings)
 
-- **Tab position:** the tab is last (Keybinds, Mods, Settings, GameBanana), not between Mods and
-  Settings. Settings is "tab 2" in about a dozen upstream places; adding at the end avoids
-  editing them all. The tab bar grows from 350 to 470 wide.
+- **Tab position:** first shipped last (after Settings). On 2026-11-19 it moved between Mods and
+  Settings at the user's request; Settings is now tab 3 and the few upstream spots that test for it
+  were changed (see CLAUDE.md).
 - **Backup location:** the old folder of an updated mod goes to `<game folder>\NRMM_GB_Backups`
   (next to `Mods`), not `<name>_old` inside the group, because any folder inside a group counts
   as a mod and would show up in NRMM.
