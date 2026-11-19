@@ -30,10 +30,11 @@ void main() {
     await dir('Ui 2');
     await File(p.join(tmp.path, 'notes.txt')).writeAsString('x');
 
-    final names = (await listLooseModFolders(
-      tmp.path,
-      '_MANAGED_',
-    )).map(p.basename).toList();
+    final names =
+        (await listLooseModFolders(
+          tmp.path,
+          '_MANAGED_',
+        )).map(p.basename).toList();
 
     expect(names, ['Ui 2', 'Ui 10']);
   });

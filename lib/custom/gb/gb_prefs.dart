@@ -22,7 +22,11 @@ class GbPrefs {
     }
   }
 
-  static Future<void> saveBrowse(String game, GbSort sort, int? category) async {
+  static Future<void> saveBrowse(
+    String game,
+    GbSort sort,
+    int? category,
+  ) async {
     try {
       final p = await SharedPreferences.getInstance();
       await p.setString(_k(game, 'sort'), sort.name);
@@ -53,10 +57,13 @@ class GbPrefs {
     try {
       final p = await SharedPreferences.getInstance();
       await p.setString(_k(game, 'group_${category.toLowerCase()}'), groupPath);
-      final recents = [
-        groupPath,
-        ...(p.getStringList(_k(game, 'recent')) ?? []).where((x) => x != groupPath),
-      ].take(5).toList();
+      final recents =
+          [
+            groupPath,
+            ...(p.getStringList(_k(game, 'recent')) ?? []).where(
+              (x) => x != groupPath,
+            ),
+          ].take(5).toList();
       await p.setStringList(_k(game, 'recent'), recents);
     } catch (_) {}
   }

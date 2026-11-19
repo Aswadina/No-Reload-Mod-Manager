@@ -79,28 +79,31 @@ void main() {
     expect(await readGbSource(m), isNull);
   });
 
-  test('scanInstalled finds sourced mods one group deep and ignores others', () async {
-    final a = await dir('group_1/ModA');
-    await dir('group_1/Plain');
-    await dir('group_2/ModB');
-    await writeGbSource(a, source);
-    await writeGbSource(
-      p.join(tmp.path, 'group_2', 'ModB'),
-      const GbSource(
-        modId: 7,
-        fileId: 1,
-        fileDate: 1,
-        modDateUpdated: null,
-        downloadedAt: 'x',
-      ),
-    );
+  test(
+    'scanInstalled finds sourced mods one group deep and ignores others',
+    () async {
+      final a = await dir('group_1/ModA');
+      await dir('group_1/Plain');
+      await dir('group_2/ModB');
+      await writeGbSource(a, source);
+      await writeGbSource(
+        p.join(tmp.path, 'group_2', 'ModB'),
+        const GbSource(
+          modId: 7,
+          fileId: 1,
+          fileDate: 1,
+          modDateUpdated: null,
+          downloadedAt: 'x',
+        ),
+      );
 
-    final found = await scanInstalled(tmp.path);
+      final found = await scanInstalled(tmp.path);
 
-    expect(found.keys.toSet(), {42, 7});
-    expect(p.equals(found[42]!.modPath, a), true);
-    expect(found[7]!.source.modDateUpdated, isNull);
-  });
+      expect(found.keys.toSet(), {42, 7});
+      expect(p.equals(found[42]!.modPath, a), true);
+      expect(found[7]!.source.modDateUpdated, isNull);
+    },
+  );
 
   test('card update badge needs a newer updated date', () {
     final inst = InstalledGbMod(modPath: 'x', source: source);
@@ -110,7 +113,10 @@ void main() {
   });
 
   test('exact update compares the newest file, not the version text', () {
-    expect(hasUpdateExact(source, _details([_file(101, 3000), _file(100, 1000)])), true);
+    expect(
+      hasUpdateExact(source, _details([_file(101, 3000), _file(100, 1000)])),
+      true,
+    );
     expect(hasUpdateExact(source, _details([_file(100, 1000)])), false);
     // Same date or older file with a different id is not an update.
     expect(hasUpdateExact(source, _details([_file(99, 900)])), false);

@@ -103,7 +103,8 @@ Future<GbPickerData> loadGbPickerData(
     reason = suggestions.first.reason;
   } else if (last != null && known.contains(last)) {
     target = GbTarget.existing(last);
-    reason = 'Last group you used for ${category.isEmpty ? 'this kind of mod' : category}';
+    reason =
+        'Last group you used for ${category.isEmpty ? 'this kind of mod' : category}';
   } else {
     final index = ref.read(currentGroupIndexProvider);
     if (candidates.isNotEmpty) {
@@ -165,20 +166,23 @@ class _GroupPickerState extends ConsumerState<_GroupPicker> {
     super.dispose();
   }
 
-  void _pick(String path) =>
-      Navigator.of(context).pop(GbTarget.existing(path));
+  void _pick(String path) => Navigator.of(context).pop(GbTarget.existing(path));
 
   @override
   Widget build(BuildContext context) {
     final sss = ref.watch(zoomScaleProvider);
-    final groups = {for (final g in ref.watch(modGroupDataProvider)) g.groupPath: g};
+    final groups = {
+      for (final g in ref.watch(modGroupDataProvider)) g.groupPath: g,
+    };
     final query = _search.text.trim().toLowerCase();
     final searching = query.isNotEmpty;
 
     bool matches(GbGroupCandidate c) =>
         !searching || c.name.toLowerCase().contains(query);
 
-    final suggestedPaths = {for (final s in widget.data.suggestions) s.group.path};
+    final suggestedPaths = {
+      for (final s in widget.data.suggestions) s.group.path,
+    };
     final recentPaths = [
       for (final p in widget.data.recents)
         if (!suggestedPaths.contains(p)) p,
@@ -203,7 +207,9 @@ class _GroupPickerState extends ConsumerState<_GroupPicker> {
         MoveWindow(),
         Dialog(
           backgroundColor: gbDialogColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: SizedBox(
             width: 460 * sss,
             height: 540 * sss,
@@ -212,7 +218,10 @@ class _GroupPickerState extends ConsumerState<_GroupPicker> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Put it in…', style: gbText(sss, 16, weight: FontWeight.w600)),
+                  Text(
+                    'Put it in…',
+                    style: gbText(sss, 16, weight: FontWeight.w600),
+                  ),
                   SizedBox(height: 10 * sss),
                   Container(
                     height: 36 * sss,
@@ -238,7 +247,8 @@ class _GroupPickerState extends ConsumerState<_GroupPicker> {
                   Expanded(
                     child: ListView(
                       children: [
-                        if (!searching && widget.data.suggestions.isNotEmpty) ...[
+                        if (!searching &&
+                            widget.data.suggestions.isNotEmpty) ...[
                           section('Suggested'),
                           for (final s in widget.data.suggestions)
                             row(s.group, reason: s.reason),
@@ -252,8 +262,7 @@ class _GroupPickerState extends ConsumerState<_GroupPicker> {
                         if (!searching) _newGroupRow(sss),
                         for (final c in widget.data.groups)
                           if (matches(c)) row(c),
-                        if (searching &&
-                            !widget.data.groups.any(matches))
+                        if (searching && !widget.data.groups.any(matches))
                           Padding(
                             padding: EdgeInsets.symmetric(vertical: 12 * sss),
                             child: Text(
@@ -302,7 +311,10 @@ class _GroupPickerState extends ConsumerState<_GroupPicker> {
                 child: Icon(Icons.add, size: 18 * sss, color: accent),
               ),
               SizedBox(width: 10 * sss),
-              Text('New group…', style: gbText(sss, 12, weight: FontWeight.w600)),
+              Text(
+                'New group…',
+                style: gbText(sss, 12, weight: FontWeight.w600),
+              ),
             ],
           ),
         ),
@@ -318,7 +330,10 @@ class _GroupPickerState extends ConsumerState<_GroupPicker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Name of the new group', style: gbText(sss, 11, color: Colors.white60)),
+          Text(
+            'Name of the new group',
+            style: gbText(sss, 11, color: Colors.white60),
+          ),
           SizedBox(height: 4 * sss),
           Container(
             height: 34 * sss,
@@ -340,31 +355,35 @@ class _GroupPickerState extends ConsumerState<_GroupPicker> {
             ),
           ),
           SizedBox(height: 8 * sss),
-          Row(
+          Wrap(
+            spacing: 6 * sss,
+            runSpacing: 6 * sss,
             children: [
               GbPill(
                 label: 'Character group',
                 selected: !_newIsUi,
                 onTap: () => setState(() => _newIsUi = false),
               ),
-              SizedBox(width: 6 * sss),
               GbPill(
                 label: 'UI group (several on)',
                 selected: _newIsUi,
                 onTap: () => setState(() => _newIsUi = true),
               ),
-              const Spacer(),
-              GbButton(
-                label: 'Create',
-                primary: true,
-                onTap:
-                    _name.text.trim().isEmpty
-                        ? null
-                        : () => Navigator.of(context).pop(
-                          GbTarget.create(_name.text.trim(), isUi: _newIsUi),
-                        ),
-              ),
             ],
+          ),
+          SizedBox(height: 10 * sss),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GbButton(
+              label: 'Create',
+              primary: true,
+              onTap:
+                  _name.text.trim().isEmpty
+                      ? null
+                      : () => Navigator.of(
+                        context,
+                      ).pop(GbTarget.create(_name.text.trim(), isUi: _newIsUi)),
+            ),
           ),
         ],
       ),
@@ -390,7 +409,8 @@ class _GroupRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sss = ref.watch(zoomScaleProvider);
     final accent = getAccentColor(ref);
-    final modCount = group == null ? 0 : group!.modsInGroup.length - 1; // minus "None"
+    final modCount =
+        group == null ? 0 : group!.modsInGroup.length - 1; // minus "None"
     final iconPath = group?.iconPath;
     return InkWell(
       onTap: onTap,
@@ -404,12 +424,19 @@ class _GroupRow extends ConsumerWidget {
               height: 38 * sss,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: selected ? accent : gbLine, width: 3 * sss),
+                border: Border.all(
+                  color: selected ? accent : gbLine,
+                  width: 3 * sss,
+                ),
               ),
               child: ClipOval(
                 child:
                     iconPath == null
-                        ? Icon(Icons.folder_outlined, size: 18 * sss, color: gbLine)
+                        ? Icon(
+                          Icons.folder_outlined,
+                          size: 18 * sss,
+                          color: gbLine,
+                        )
                         : Image.file(
                           File(iconPath),
                           fit: BoxFit.cover,

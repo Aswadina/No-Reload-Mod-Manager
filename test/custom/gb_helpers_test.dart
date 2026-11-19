@@ -31,7 +31,10 @@ void main() {
     final now = DateTime.utc(2026, 11, 19, 12);
     int ago(Duration d) => now.subtract(d).millisecondsSinceEpoch ~/ 1000;
     expect(ageLabel(ago(const Duration(hours: 5)), now: now), 'today');
-    expect(ageLabel(ago(const Duration(days: 1, hours: 1)), now: now), '1d ago');
+    expect(
+      ageLabel(ago(const Duration(days: 1, hours: 1)), now: now),
+      '1d ago',
+    );
     expect(ageLabel(ago(const Duration(days: 12)), now: now), '12d ago');
     expect(ageLabel(ago(const Duration(days: 75)), now: now), '2mo ago');
     expect(ageLabel(ago(const Duration(days: 800)), now: now), '2y ago');
@@ -58,7 +61,11 @@ void main() {
   });
 
   group('suggestGroups', () {
-    const raiden = GbGroupCandidate(path: 'g1', name: 'Raiden Shogun', isUi: false);
+    const raiden = GbGroupCandidate(
+      path: 'g1',
+      name: 'Raiden Shogun',
+      isUi: false,
+    );
     const hutao = GbGroupCandidate(path: 'g2', name: 'Hu Tao', isUi: false);
     const ui = GbGroupCandidate(path: 'g3', name: 'Interface', isUi: true);
     const all = [hutao, raiden, ui];
@@ -108,7 +115,11 @@ void main() {
     });
 
     test('short or generic words do not cause false matches', () {
-      const generic = GbGroupCandidate(path: 'g9', name: 'The Mod Skin', isUi: false);
+      const generic = GbGroupCandidate(
+        path: 'g9',
+        name: 'The Mod Skin',
+        isUi: false,
+      );
       expect(
         suggestGroups(
           modName: 'The best mod skin ever',

@@ -254,25 +254,50 @@ class _TabGameBananaState extends ConsumerState<TabGameBanana> {
       child: Column(
         children: [
           _topBar(sss, game),
-          SizedBox(height: 8 * sss),
-          _groupChips(sss),
-          _categoryChips(sss),
-          SizedBox(height: 8 * sss),
-          Expanded(child: _body(sss, game)),
-          if (_totalPages > 0) ...[
-            SizedBox(height: 8 * sss),
-            _pager(sss),
-          ],
+          SizedBox(height: 2 * sss),
+          // Filters scroll with the cards, so a small window still shows mods.
+          Expanded(child: _scrollArea(sss, game)),
+          if (_totalPages > 0) ...[SizedBox(height: 8 * sss), _pager(sss)],
         ],
       ),
     );
   }
 
-  // ---------- rows above the grid ----------
+  // ---------- the one filter row above the grid ----------
+
+  /// Names of the user's groups, trimmed to something worth searching for.
+  List<String> _groupTerms() {
+    final terms = <String>[];
+    for (final g in ref.read(modGroupDataProvider)) {
+      final term = searchTermForGroup(g.groupName);
+      if (term.isEmpty || RegExp(r'^group_\d+$').hasMatch(term)) continue;
+      if (!terms.any((t) => t.toLowerCase() == term.toLowerCase())) {
+        terms.add(term);
+      }
+    }
+    return terms;
+  }
 
   Widget _topBar(double sss, TargetGame game) {
     final accent = getAccentColor(ref);
     final hasGame = gbGameIds.containsKey(game);
+    // Watch, so the "Find mods for" list follows the user's groups.
+    ref.watch(modGroupDataProvider);
+    final terms = _groupTerms();
+    final searchingTerm = terms.firstWhere(
+      (t) => t.toLowerCase() == _query.toLowerCase(),
+      orElse: () => '',
+    );
+    final category = _categories.where((c) => c.id == _categoryId);
+    final categoryName = category.isEmpty ? null : category.first.name;
+
+    TextStyle menuStyle(bool on) => gbText(
+      sss,
+      12,
+      weight: on ? FontWeight.w700 : FontWeight.w400,
+      color: on ? accent : Colors.white,
+    );
+
     return Row(
       children: [
         Expanded(
@@ -314,14 +339,79 @@ class _TabGameBananaState extends ConsumerState<TabGameBanana> {
                     },
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
-                      child: Icon(Icons.close, size: 16 * sss, color: Colors.white70),
+                      child: Icon(
+                        Icons.close,
+                        size: 16 * sss,
+                        color: Colors.white70,
+                      ),
                     ),
                   ),
               ],
             ),
           ),
         ),
-        SizedBox(width: 10 * sss),
+        if (_categories.isNotEmpty) ...[
+          SizedBox(width: 8 * sss),
+          PopupMenuButton<int>(
+            tooltip: 'Filter by category',
+            color: gbDialogColor,
+            onSelected: (id) => _pickCategory(id < 0 ? null : id),
+            itemBuilder:
+                (_) => [
+                  PopupMenuItem(
+                    value: -1,
+                    child: Text(
+                      'All categories',
+                      style: menuStyle(_query.isEmpty && _categoryId == null),
+                    ),
+                  ),
+                  for (final c in _categories)
+                    PopupMenuItem(
+                      value: c.id,
+                      child: Text(
+                        '${c.name}   ${_withCommas(c.itemCount)}',
+                        style: menuStyle(_query.isEmpty && _categoryId == c.id),
+                      ),
+                    ),
+                ],
+            child: IgnorePointer(
+              child: GbPill(
+                label: 'Category: ${categoryName ?? 'All'}  ▾',
+                selected: categoryName != null && _query.isEmpty,
+              ),
+            ),
+          ),
+        ],
+        if (terms.isNotEmpty) ...[
+          SizedBox(width: 6 * sss),
+          PopupMenuButton<String>(
+            tooltip: 'Search for one of your groups',
+            color: gbDialogColor,
+            onSelected: (t) {
+              _search.text = t;
+              _runSearch(t);
+              setState(() {});
+            },
+            itemBuilder:
+                (_) => [
+                  for (final t in terms)
+                    PopupMenuItem(
+                      value: t,
+                      child: Text(t, style: menuStyle(t == searchingTerm)),
+                    ),
+                ],
+            child: IgnorePointer(
+              child: GbPill(
+                label:
+                    searchingTerm.isEmpty
+                        ? 'Find mods for  ▾'
+                        : 'For: $searchingTerm  ▾',
+                selected: searchingTerm.isNotEmpty,
+              ),
+            ),
+          ),
+        ],
+        SizedBox(width: 6 * sss),
         PopupMenuButton<GbSort>(
           tooltip: 'Sort',
           color: gbDialogColor,
@@ -333,99 +423,17 @@ class _TabGameBananaState extends ConsumerState<TabGameBanana> {
                     value: s,
                     child: Text(
                       s.label,
-                      style: gbText(
-                        sss,
-                        12,
-                        weight: s == _sort && _query.isEmpty ? FontWeight.w700 : FontWeight.w400,
-                        color: s == _sort && _query.isEmpty ? accent : Colors.white,
-                      ),
+                      style: menuStyle(s == _sort && _query.isEmpty),
                     ),
                   ),
               ],
           child: IgnorePointer(
             child: GbPill(
               label: 'Sort: ${_query.isEmpty ? _sort.label : 'Relevance'}  ▾',
-              icon: Icons.sort,
             ),
           ),
         ),
       ],
-    );
-  }
-
-  /// One chip per group the user already has: a quick way to find a character.
-  Widget _groupChips(double sss) {
-    final terms = <String>[];
-    for (final g in ref.watch(modGroupDataProvider)) {
-      final term = searchTermForGroup(g.groupName);
-      if (term.isEmpty || RegExp(r'^group_\d+$').hasMatch(term)) continue;
-      if (!terms.any((t) => t.toLowerCase() == term.toLowerCase())) terms.add(term);
-    }
-    if (terms.isEmpty) return const SizedBox.shrink();
-    return _chipRow(
-      sss,
-      'Find mods for',
-      [
-        for (final t in terms)
-          GbPill(
-            label: t,
-            selected: _query.toLowerCase() == t.toLowerCase(),
-            onTap: () {
-              _search.text = t;
-              _runSearch(t);
-              setState(() {});
-            },
-          ),
-      ],
-    );
-  }
-
-  Widget _categoryChips(double sss) {
-    if (_categories.isEmpty) return const SizedBox.shrink();
-    return _chipRow(
-      sss,
-      'Category',
-      [
-        GbPill(
-          label: 'All',
-          selected: _query.isEmpty && _categoryId == null,
-          onTap: () => _pickCategory(null),
-        ),
-        for (final c in _categories)
-          GbPill(
-            label: '${c.name}  ${formatCount(c.itemCount)}',
-            selected: _query.isEmpty && _categoryId == c.id,
-            onTap: () => _pickCategory(c.id),
-          ),
-      ],
-    );
-  }
-
-  Widget _chipRow(double sss, String label, List<Widget> chips) {
-    return Padding(
-      padding: EdgeInsets.only(top: 6 * sss),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 92 * sss,
-            child: Text(label, style: gbText(sss, 11, color: Colors.white60)),
-          ),
-          Expanded(
-            child: SizedBox(
-              height: 32 * sss,
-              child: ScrollConfiguration(
-                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: chips.length,
-                  separatorBuilder: (_, _) => SizedBox(width: 6 * sss),
-                  itemBuilder: (_, i) => Center(child: chips[i]),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -439,49 +447,75 @@ class _TabGameBananaState extends ConsumerState<TabGameBanana> {
         mainAxisSpacing: 10 * sss,
       );
 
-  Widget _body(double sss, TargetGame game) {
-    if (!gbGameIds.containsKey(game)) {
-      return const GbMessage(
-        'Choose a game first. GameBanana mods are shown for the game NRMM is set to.',
-      );
+  Widget _scrollArea(double sss, TargetGame game) {
+    final hasGame = gbGameIds.containsKey(game);
+    final ready = hasGame && ref.watch(validModsPath) != null;
+
+    Widget message(Widget w) => SliverToBoxAdapter(
+      child: Padding(padding: EdgeInsets.only(top: 40 * sss), child: w),
+    );
+
+    final List<Widget> content;
+    if (!hasGame) {
+      content = [
+        message(
+          const GbMessage(
+            'Choose a game first. GameBanana mods are shown for the game NRMM is set to.',
+          ),
+        ),
+      ];
+    } else if (!ready) {
+      content = [
+        message(
+          const GbMessage(
+            'The Mods folder is not ready yet. Set it up in Settings, then come back.',
+          ),
+        ),
+      ];
+    } else if (_error != null) {
+      content = [message(GbMessage(_error!, retry: () => _go(_page)))];
+    } else if (_loading || (_mods.isEmpty && !_started)) {
+      content = [
+        SliverGrid(
+          gridDelegate: _gridDelegate(sss),
+          delegate: SliverChildBuilderDelegate(
+            (_, _) => const GbSkeletonCard(),
+            childCount: 10,
+          ),
+        ),
+      ];
+    } else if (_mods.isEmpty) {
+      content = [message(const GbMessage('No mods found.'))];
+    } else {
+      content = [
+        SliverGrid(
+          gridDelegate: _gridDelegate(sss),
+          delegate: SliverChildBuilderDelegate((context, i) {
+            final mod = _mods[i];
+            final installed = _installed[mod.id];
+            return _GbCard(
+              mod: mod,
+              badge:
+                  installed == null
+                      ? null
+                      : hasUpdateForCard(installed, mod)
+                      ? _Badge.update
+                      : _Badge.installed,
+              onTap: () => _openDetails(mod),
+            );
+          }, childCount: _mods.length),
+        ),
+      ];
     }
-    if (ref.watch(validModsPath) == null) {
-      return const GbMessage(
-        'The Mods folder is not ready yet. Set it up in Settings, then come back.',
-      );
-    }
-    if (_error != null) {
-      return GbMessage(_error!, retry: () => _go(_page));
-    }
-    if (_loading || (_mods.isEmpty && !_started)) {
-      return GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: _gridDelegate(sss),
-        itemCount: 10,
-        itemBuilder: (_, _) => const GbSkeletonCard(),
-      );
-    }
-    if (_mods.isEmpty) return const GbMessage('No mods found.');
+
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-      child: GridView.builder(
+      child: CustomScrollView(
         controller: _scroll,
-        gridDelegate: _gridDelegate(sss),
-        itemCount: _mods.length,
-        itemBuilder: (context, i) {
-          final mod = _mods[i];
-          final installed = _installed[mod.id];
-          return _GbCard(
-            mod: mod,
-            badge:
-                installed == null
-                    ? null
-                    : hasUpdateForCard(installed, mod)
-                    ? _Badge.update
-                    : _Badge.installed,
-            onTap: () => _openDetails(mod),
-          );
-        },
+        slivers: [
+          SliverToBoxAdapter(child: SizedBox(height: 8 * sss)),
+          ...content,
+        ],
       ),
     );
   }
@@ -497,73 +531,85 @@ class _TabGameBananaState extends ConsumerState<TabGameBanana> {
 
     final atFirst = _page <= 1;
     final atLast = _page >= _totalPages;
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            '${_withCommas(_totalCount)} mods  ·  page $_page of ${_withCommas(_totalPages)}',
-            style: gbText(sss, 11, color: Colors.white60),
-          ),
-        ),
-        nav('«', atFirst ? null : 1),
-        SizedBox(width: 4 * sss),
-        nav('‹', atFirst ? null : _page - 1),
-        SizedBox(width: 4 * sss),
-        for (final n in pageWindow(_page, _totalPages)) ...[
-          if (n == null)
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4 * sss),
-              child: Text('…', style: gbText(sss, 12, color: Colors.white60)),
-            )
-          else
-            GbPill(
-              label: '$n',
-              compact: true,
-              selected: n == _page,
-              onTap: n == _page || _loading ? null : () => _go(n),
-            ),
-          SizedBox(width: 4 * sss),
-        ],
-        nav('›', atLast ? null : _page + 1),
-        SizedBox(width: 4 * sss),
-        nav('»', atLast ? null : _totalPages),
-        SizedBox(width: 10 * sss),
-        Container(
-          width: 74 * sss,
-          height: 26 * sss,
-          padding: EdgeInsets.symmetric(horizontal: 10 * sss),
-          decoration: BoxDecoration(
-            border: Border.all(color: gbLine, width: 3 * sss),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: TextField(
-            controller: _jump,
-            style: gbText(sss, 11),
-            cursorColor: getAccentColor(ref),
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              isCollapsed: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 5 * sss),
-              hintText: 'Go to…',
-              hintStyle: gbText(sss, 11, color: Colors.white54),
-            ),
-            onSubmitted: (text) {
-              final n = int.tryParse(text.trim());
-              if (n != null) unawaited(_go(n.clamp(1, _totalPages)));
-              _jump.clear();
-            },
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, c) {
+        final roomy = c.maxWidth > 700 * sss;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (roomy)
+              Expanded(
+                child: Text(
+                  '${_withCommas(_totalCount)} mods  ·  page $_page of ${_withCommas(_totalPages)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: gbText(sss, 11, color: Colors.white60),
+                ),
+              ),
+            nav('«', atFirst ? null : 1),
+            SizedBox(width: 4 * sss),
+            nav('‹', atFirst ? null : _page - 1),
+            SizedBox(width: 4 * sss),
+            for (final n in pageWindow(_page, _totalPages)) ...[
+              if (n == null)
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4 * sss),
+                  child: Text(
+                    '…',
+                    style: gbText(sss, 12, color: Colors.white60),
+                  ),
+                )
+              else
+                GbPill(
+                  label: '$n',
+                  compact: true,
+                  selected: n == _page,
+                  onTap: n == _page || _loading ? null : () => _go(n),
+                ),
+              SizedBox(width: 4 * sss),
+            ],
+            nav('›', atLast ? null : _page + 1),
+            SizedBox(width: 4 * sss),
+            nav('»', atLast ? null : _totalPages),
+            if (roomy) ...[
+              SizedBox(width: 10 * sss),
+              Container(
+                width: 74 * sss,
+                height: 26 * sss,
+                padding: EdgeInsets.symmetric(horizontal: 10 * sss),
+                decoration: BoxDecoration(
+                  border: Border.all(color: gbLine, width: 3 * sss),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: TextField(
+                  controller: _jump,
+                  style: gbText(sss, 11),
+                  cursorColor: getAccentColor(ref),
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    isCollapsed: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 5 * sss),
+                    hintText: 'Go to…',
+                    hintStyle: gbText(sss, 11, color: Colors.white54),
+                  ),
+                  onSubmitted: (text) {
+                    final n = int.tryParse(text.trim());
+                    if (n != null) unawaited(_go(n.clamp(1, _totalPages)));
+                    _jump.clear();
+                  },
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
 
-String _withCommas(int n) => n.toString().replaceAllMapped(
-  RegExp(r'\B(?=(\d{3})+(?!\d))'),
-  (_) => ',',
-);
+String _withCommas(int n) =>
+    n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
 
 enum _Badge { installed, update }
 
@@ -587,7 +633,10 @@ class _GbCardState extends ConsumerState<_GbCard> {
     final kind =
         mod.subCategoryName.isNotEmpty ? mod.subCategoryName : mod.categoryName;
     final age = ageLabel(mod.dateAdded);
-    final line1 = [if (kind.isNotEmpty) kind, if (age.isNotEmpty) age].join('  ·  ');
+    final line1 = [
+      if (kind.isNotEmpty) kind,
+      if (age.isNotEmpty) age,
+    ].join('  ·  ');
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -614,7 +663,11 @@ class _GbCardState extends ConsumerState<_GbCard> {
                   fit: StackFit.expand,
                   children: [
                     mod.thumbUrl == null
-                        ? Icon(Icons.image_outlined, size: 40 * sss, color: gbLine)
+                        ? Icon(
+                          Icons.image_outlined,
+                          size: 40 * sss,
+                          color: gbLine,
+                        )
                         : GbNetworkImage(mod.thumbUrl!, cacheWidth: 400),
                     if (widget.badge != null)
                       Positioned(
@@ -630,7 +683,9 @@ class _GbCardState extends ConsumerState<_GbCard> {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            widget.badge == _Badge.update ? 'Update' : 'Installed',
+                            widget.badge == _Badge.update
+                                ? 'Update'
+                                : 'Installed',
                             style: gbText(
                               sss,
                               10,

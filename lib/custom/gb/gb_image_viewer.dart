@@ -73,7 +73,9 @@ class _ViewerState extends State<_Viewer> {
                       (context, child, progress) =>
                           progress == null
                               ? child
-                              : const Center(child: CircularProgressIndicator()),
+                              : const Center(
+                                child: CircularProgressIndicator(),
+                              ),
                   errorBuilder:
                       (_, _, _) => const Icon(
                         Icons.image_not_supported_outlined,
@@ -124,7 +126,10 @@ class _ViewerState extends State<_Viewer> {
               right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color.fromARGB(160, 0, 0, 0),
                     borderRadius: BorderRadius.circular(999),

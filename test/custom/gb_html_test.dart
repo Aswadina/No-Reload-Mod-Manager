@@ -1,12 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:no_reload_mod_manager/custom/gb/gb_html.dart';
 
-String plain(List<GbBlock> blocks) =>
-    blocks.map((b) => (b.bullet ? '• ' : '') + b.spans.map((s) => s.text).join()).join('\n');
+String plain(List<GbBlock> blocks) => blocks
+    .map((b) => (b.bullet ? '• ' : '') + b.spans.map((s) => s.text).join())
+    .join('\n');
 
 void main() {
   test('plain text and entities', () {
-    final b = parseGbHtml('Fish &amp; chips &lt;3 &quot;hi&quot; &#39;x&#39; a&nbsp;b');
+    final b = parseGbHtml(
+      'Fish &amp; chips &lt;3 &quot;hi&quot; &#39;x&#39; a&nbsp;b',
+    );
     expect(plain(b), 'Fish & chips <3 "hi" \'x\' a b');
   });
 
@@ -42,13 +45,20 @@ void main() {
   });
 
   test('unknown tags and scripts are dropped, unclosed tags do not crash', () {
-    expect(plain(parseGbHtml('<script>alert(1)</script>Hi <span class="x">there</span>')), 'Hi there');
+    expect(
+      plain(
+        parseGbHtml('<script>alert(1)</script>Hi <span class="x">there</span>'),
+      ),
+      'Hi there',
+    );
     expect(plain(parseGbHtml('<b>never closed <i>x')), 'never closed x');
     expect(plain(parseGbHtml('')), '');
   });
 
   test('javascript: links are not kept', () {
-    final b = parseGbHtml('<a href="javascript:alert(1)">bad</a> <a href="http://ok.com">ok</a>');
+    final b = parseGbHtml(
+      '<a href="javascript:alert(1)">bad</a> <a href="http://ok.com">ok</a>',
+    );
     final spans = b.single.spans;
     expect(spans.firstWhere((s) => s.text == 'bad').link, isNull);
     expect(spans.firstWhere((s) => s.text == 'ok').link, 'http://ok.com');

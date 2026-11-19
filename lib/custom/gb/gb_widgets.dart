@@ -19,16 +19,22 @@ Future<void> gbOpenUrl(String url) async {
   } catch (_) {}
 }
 
+/// Tests switch this off, because google_fonts cannot load fonts there.
+bool gbUsePoppins = true;
+
 TextStyle gbText(
   double sss,
   double size, {
   FontWeight weight = FontWeight.w400,
   Color color = Colors.white,
-}) => GoogleFonts.poppins(
-  fontSize: size * sss,
-  fontWeight: weight,
-  color: color,
-);
+}) =>
+    gbUsePoppins
+        ? GoogleFonts.poppins(
+          fontSize: size * sss,
+          fontWeight: weight,
+          color: color,
+        )
+        : TextStyle(fontSize: size * sss, fontWeight: weight, color: color);
 
 /// A pill like the tab bar's. Highlights with the accent color when selected.
 class GbPill extends ConsumerStatefulWidget {
@@ -126,24 +132,26 @@ class GbButton extends ConsumerWidget {
           opacity: enabled ? 1 : 0.4,
           child: Container(
             height: 36 * sss,
-            padding: EdgeInsets.symmetric(horizontal: 18 * sss),
+            padding: EdgeInsets.symmetric(
+              horizontal: (label.isEmpty ? 11 : 18) * sss,
+            ),
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: primary ? accent : Colors.transparent,
-              border: Border.all(color: primary ? accent : gbLine, width: 3 * sss),
+              border: Border.all(
+                color: primary ? accent : gbLine,
+                width: 3 * sss,
+              ),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (icon != null) ...[
+                if (icon != null)
                   Icon(icon, size: 16 * sss, color: Colors.white),
-                  SizedBox(width: 6 * sss),
-                ],
-                Text(
-                  label,
-                  style: gbText(sss, 12, weight: FontWeight.w600),
-                ),
+                if (icon != null && label.isNotEmpty) SizedBox(width: 6 * sss),
+                if (label.isNotEmpty)
+                  Text(label, style: gbText(sss, 12, weight: FontWeight.w600)),
               ],
             ),
           ),

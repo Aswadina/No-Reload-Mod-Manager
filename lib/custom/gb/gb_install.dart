@@ -90,9 +90,9 @@ Future<String> updateMod({
       return path;
     } catch (_) {
       // Put the old version back exactly where it was.
-      await Directory(existingModPath).delete(recursive: true).catchError(
-        (_) => Directory(existingModPath),
-      );
+      await Directory(
+        existingModPath,
+      ).delete(recursive: true).catchError((_) => Directory(existingModPath));
       await Directory(backupPath).rename(existingModPath);
       rethrow;
     }
@@ -188,7 +188,8 @@ Future<String> _fetchAndStage({
   // One wrapper folder with nothing beside it IS the mod. Otherwise the
   // whole archive is the mod.
   final bool wrapper = entries.length == 1 && entries.single is Directory;
-  final name = forceName ?? (wrapper ? p.basename(entries.single.path) : fallbackName);
+  final name =
+      forceName ?? (wrapper ? p.basename(entries.single.path) : fallbackName);
   final finalDir = Directory(p.join(workDir, 'final'));
   await finalDir.create();
   final target = p.join(finalDir.path, name);

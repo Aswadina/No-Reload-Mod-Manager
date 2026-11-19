@@ -22,7 +22,8 @@ const Map<TargetGame, int> gbGameIds = {
 /// The app's one shared HTTP client.
 http.Client get gbHttpClient => httpClient.client;
 
-final GbApi gbApi = GbApi(httpClient.client);
+/// Not final so tests can swap in a fake.
+GbApi gbApi = GbApi(httpClient.client);
 
 Future<bool> gbSevenZipExtract(String archive, String outDir) async =>
     (await SevenZip.instance.extract(archive, outputDir: outDir)).success;

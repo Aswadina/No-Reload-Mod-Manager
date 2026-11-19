@@ -84,14 +84,39 @@ class GbSuggestion {
 }
 
 const _stopWords = {
-  'the', 'and', 'mod', 'mods', 'skin', 'skins', 'outfit', 'for', 'with',
-  'new', 'old', 'version', 'pack', 'edit', 'remove', 'genshin', 'impact',
-  'honkai', 'star', 'rail', 'zenless', 'zone', 'zero', 'wuthering', 'waves',
-  'arknights', 'endfield',
+  'the',
+  'and',
+  'mod',
+  'mods',
+  'skin',
+  'skins',
+  'outfit',
+  'for',
+  'with',
+  'new',
+  'old',
+  'version',
+  'pack',
+  'edit',
+  'remove',
+  'genshin',
+  'impact',
+  'honkai',
+  'star',
+  'rail',
+  'zenless',
+  'zone',
+  'zero',
+  'wuthering',
+  'waves',
+  'arknights',
+  'endfield',
 };
 
 Set<String> _tokens(String text) => {
-  for (final t in text.toLowerCase().split(RegExp(r'[^\p{L}\p{N}]+', unicode: true)))
+  for (final t in text.toLowerCase().split(
+    RegExp(r'[^\p{L}\p{N}]+', unicode: true),
+  ))
     if (t.length >= 3 && !_stopWords.contains(t)) t,
 };
 
@@ -107,8 +132,7 @@ List<GbSuggestion> suggestGroups({
   if (categoryName.toLowerCase() == 'ui') {
     final uiGroups = [
       for (final g in groups)
-        if (g.isUi)
-          GbSuggestion(group: g, reason: 'UI mods go in a UI group'),
+        if (g.isUi) GbSuggestion(group: g, reason: 'UI mods go in a UI group'),
     ];
     if (uiGroups.isNotEmpty) return uiGroups;
   }

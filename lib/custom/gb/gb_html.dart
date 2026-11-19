@@ -22,7 +22,11 @@ final _href = RegExp(r'''href\s*=\s*["']([^"']*)["']''', caseSensitive: false);
 
 List<GbBlock> parseGbHtml(String html) {
   final cleaned = html.replaceAll(
-    RegExp(r'<(script|style)[^>]*>.*?</\1>', caseSensitive: false, dotAll: true),
+    RegExp(
+      r'<(script|style)[^>]*>.*?</\1>',
+      caseSensitive: false,
+      dotAll: true,
+    ),
     '',
   );
 
@@ -37,13 +41,24 @@ List<GbBlock> parseGbHtml(String html) {
     // Trim the outer whitespace of the block, then drop empty pieces.
     if (spans.isNotEmpty) {
       final first = spans.first;
-      spans[0] = GbSpan(first.text.trimLeft(),
-          bold: first.bold, italic: first.italic, link: first.link);
+      spans[0] = GbSpan(
+        first.text.trimLeft(),
+        bold: first.bold,
+        italic: first.italic,
+        link: first.link,
+      );
       final last = spans.last;
-      spans[spans.length - 1] = GbSpan(last.text.trimRight(),
-          bold: last.bold, italic: last.italic, link: last.link);
+      spans[spans.length - 1] = GbSpan(
+        last.text.trimRight(),
+        bold: last.bold,
+        italic: last.italic,
+        link: last.link,
+      );
     }
-    final kept = [for (final s in spans) if (s.text.isNotEmpty) s];
+    final kept = [
+      for (final s in spans)
+        if (s.text.isNotEmpty) s,
+    ];
     if (kept.isNotEmpty) blocks.add(GbBlock(bullet: bullet, spans: kept));
     spans = [];
     bullet = false;
@@ -54,12 +69,14 @@ List<GbBlock> parseGbHtml(String html) {
     if (text != null) {
       final collapsed = text.replaceAll(RegExp(r'\s+'), ' ');
       if (collapsed == ' ' && spans.isEmpty) continue;
-      spans.add(GbSpan(
-        _decode(collapsed),
-        bold: bold > 0,
-        italic: italic > 0,
-        link: links.isEmpty ? null : links.last,
-      ));
+      spans.add(
+        GbSpan(
+          _decode(collapsed),
+          bold: bold > 0,
+          italic: italic > 0,
+          link: links.isEmpty ? null : links.last,
+        ),
+      );
       continue;
     }
     final name = m.group(2)?.toLowerCase();
@@ -79,13 +96,22 @@ List<GbBlock> parseGbHtml(String html) {
           if (links.isNotEmpty) links.removeLast();
         } else {
           final href = _href.firstMatch(m.group(3) ?? '')?.group(1);
-          final ok = href != null && RegExp(r'^https?://', caseSensitive: false).hasMatch(href);
+          final ok =
+              href != null &&
+              RegExp(r'^https?://', caseSensitive: false).hasMatch(href);
           links.add(ok ? _decode(href) : null);
         }
       case 'li':
         flush();
         if (!closing) bullet = true;
-      case 'br' || 'p' || 'div' || 'ul' || 'ol' || 'tr' || 'table' || 'blockquote':
+      case 'br' ||
+          'p' ||
+          'div' ||
+          'ul' ||
+          'ol' ||
+          'tr' ||
+          'table' ||
+          'blockquote':
         flush();
       default:
         break; // span, img, font, u, ... : keep the text, ignore the tag
@@ -95,22 +121,22 @@ List<GbBlock> parseGbHtml(String html) {
   return blocks;
 }
 
-String _decode(String s) => s.replaceAllMapped(
-  RegExp(r'&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);'),
-  (m) {
-    final e = m.group(1)!;
-    if (e.startsWith('#x')) {
-      return String.fromCharCode(int.parse(e.substring(2), radix: 16));
-    }
-    if (e.startsWith('#')) return String.fromCharCode(int.parse(e.substring(1)));
-    return switch (e) {
-      'amp' => '&',
-      'lt' => '<',
-      'gt' => '>',
-      'quot' => '"',
-      'apos' => "'",
-      'nbsp' => ' ',
-      _ => m.group(0)!,
-    };
-  },
-);
+String _decode(String s) =>
+    s.replaceAllMapped(RegExp(r'&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);'), (m) {
+      final e = m.group(1)!;
+      if (e.startsWith('#x')) {
+        return String.fromCharCode(int.parse(e.substring(2), radix: 16));
+      }
+      if (e.startsWith('#')) {
+        return String.fromCharCode(int.parse(e.substring(1)));
+      }
+      return switch (e) {
+        'amp' => '&',
+        'lt' => '<',
+        'gt' => '>',
+        'quot' => '"',
+        'apos' => "'",
+        'nbsp' => ' ',
+        _ => m.group(0)!,
+      };
+    });

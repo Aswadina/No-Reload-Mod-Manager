@@ -64,17 +64,19 @@ void main() {
       MockClient((r) async => http.Response.bytes(bytes, status));
 
   /// Fake unpacker: writes the given relative files into the output folder.
-  GbExtract fakeExtract(Map<String, String> files, {bool ok = true}) =>
-      (archive, outDir) async {
-        expect(File(archive).existsSync(), true);
-        await Directory(outDir).create(recursive: true);
-        for (final e in files.entries) {
-          final f = File(p.join(outDir, e.key));
-          await f.parent.create(recursive: true);
-          await f.writeAsString(e.value);
-        }
-        return ok;
-      };
+  GbExtract fakeExtract(Map<String, String> files, {bool ok = true}) => (
+    archive,
+    outDir,
+  ) async {
+    expect(File(archive).existsSync(), true);
+    await Directory(outDir).create(recursive: true);
+    for (final e in files.entries) {
+      final f = File(p.join(outDir, e.key));
+      await f.parent.create(recursive: true);
+      await f.writeAsString(e.value);
+    }
+    return ok;
+  };
 
   Future<String> install(
     Map<String, String> files, {
@@ -149,7 +151,10 @@ void main() {
       throwsA(isA<GbException>()),
     );
     expect(Directory(group).listSync(), isEmpty);
-    expect(Directory(temp).existsSync() ? Directory(temp).listSync() : [], isEmpty);
+    expect(
+      Directory(temp).existsSync() ? Directory(temp).listSync() : [],
+      isEmpty,
+    );
   });
 
   test('failed unpack installs nothing', () async {
@@ -194,28 +199,31 @@ void main() {
     return old;
   }
 
-  test('update swaps the folder, keeps the old one in backup, carries icon', () async {
-    final old = await makeOld();
-    final f = file(id: 12, date: 6000);
-    final path = await updateMod(
-      client: client(),
-      details: details(f),
-      file: f,
-      existingModPath: old,
-      backupRoot: backup,
-      tempRoot: temp,
-      extract: fakeExtract({'CoolMod/new.ini': 'new'}),
-      carryOverFiles: const ['icon.png'],
-    );
+  test(
+    'update swaps the folder, keeps the old one in backup, carries icon',
+    () async {
+      final old = await makeOld();
+      final f = file(id: 12, date: 6000);
+      final path = await updateMod(
+        client: client(),
+        details: details(f),
+        file: f,
+        existingModPath: old,
+        backupRoot: backup,
+        tempRoot: temp,
+        extract: fakeExtract({'CoolMod/new.ini': 'new'}),
+        carryOverFiles: const ['icon.png'],
+      );
 
-    expect(p.equals(path, old), true); // same name, same place
-    expect(File(p.join(old, 'new.ini')).existsSync(), true);
-    expect(File(p.join(old, 'old.ini')).existsSync(), false);
-    expect(File(p.join(old, 'icon.png')).readAsStringSync(), 'my icon');
-    expect((await readGbSource(old))!.fileId, 12);
-    final kept = Directory(backup).listSync().single.path;
-    expect(File(p.join(kept, 'old.ini')).existsSync(), true);
-  });
+      expect(p.equals(path, old), true); // same name, same place
+      expect(File(p.join(old, 'new.ini')).existsSync(), true);
+      expect(File(p.join(old, 'old.ini')).existsSync(), false);
+      expect(File(p.join(old, 'icon.png')).readAsStringSync(), 'my icon');
+      expect((await readGbSource(old))!.fileId, 12);
+      final kept = Directory(backup).listSync().single.path;
+      expect(File(p.join(kept, 'old.ini')).existsSync(), true);
+    },
+  );
 
   test('failed update leaves the old folder untouched', () async {
     final old = await makeOld();
@@ -234,6 +242,9 @@ void main() {
     );
     expect(File(p.join(old, 'old.ini')).existsSync(), true);
     expect((await readGbSource(old))!.fileId, 1);
-    expect(Directory(backup).existsSync() ? Directory(backup).listSync() : [], isEmpty);
+    expect(
+      Directory(backup).existsSync() ? Directory(backup).listSync() : [],
+      isEmpty,
+    );
   });
 }

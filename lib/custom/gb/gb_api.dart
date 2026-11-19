@@ -308,7 +308,10 @@ class GbApi {
         if (j['_aLicenseChecklist'] is Map)
           for (final e in (j['_aLicenseChecklist'] as Map).entries)
             if (e.value is List)
-              '${e.key}': [for (final x in e.value as List) if (x is String) x],
+              '${e.key}': [
+                for (final x in e.value as List)
+                  if (x is String) x,
+              ],
       },
       downloadCount: _int(j['_nDownloadCount']) ?? 0,
       viewCount: _int(j['_nViewCount']) ?? 0,
@@ -393,7 +396,9 @@ List<String> _tags(Object? v) => [
 ];
 
 int? _int(Object? v) =>
-    v is int ? v : (v is String ? int.tryParse(v) : (v is num ? v.toInt() : null));
+    v is int
+        ? v
+        : (v is String ? int.tryParse(v) : (v is num ? v.toInt() : null));
 
 /// Picture urls, medium size when GameBanana has one.
 List<String> _imageUrls(Object? previewMedia, {bool full = false}) {
@@ -405,8 +410,16 @@ List<String> _imageUrls(Object? previewMedia, {bool full = false}) {
     final base = _str(img['_sBaseUrl']);
     final candidates =
         full
-            ? [_str(img['_sFile']), _str(img['_sFile530']), _str(img['_sFile220'])]
-            : [_str(img['_sFile530']), _str(img['_sFile220']), _str(img['_sFile'])];
+            ? [
+              _str(img['_sFile']),
+              _str(img['_sFile530']),
+              _str(img['_sFile220']),
+            ]
+            : [
+              _str(img['_sFile530']),
+              _str(img['_sFile220']),
+              _str(img['_sFile']),
+            ];
     final file = candidates.firstWhere((f) => f.isNotEmpty, orElse: () => '');
     if (base.isNotEmpty && file.isNotEmpty) urls.add('$base/$file');
   }

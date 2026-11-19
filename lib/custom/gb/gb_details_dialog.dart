@@ -128,7 +128,8 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
     if (chosen != null && mounted) {
       setState(() {
         _target = chosen;
-        _targetReason = chosen.isNew ? 'A new group will be made' : 'Your choice';
+        _targetReason =
+            chosen.isNew ? 'A new group will be made' : 'Your choice';
       });
     }
   }
@@ -137,7 +138,8 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
   Future<String> _createGroup(GbTarget target) async {
     final index = await addGroup(ref, gbManagedPath(widget.modsPath));
     final groups = ref.read(modGroupDataProvider);
-    final path = groups[((index ?? 1) - 1).clamp(0, groups.length - 1)].groupPath;
+    final path =
+        groups[((index ?? 1) - 1).clamp(0, groups.length - 1)].groupPath;
     await setGroupNameOnDisk(path, target.newName!);
     ref.read(modGroupDataProvider.notifier).state = [
       for (final g in ref.read(modGroupDataProvider))
@@ -257,9 +259,15 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 11, child: _gallery(sss)),
+                      Expanded(
+                        flex: width < 860 * sss ? 8 : 11,
+                        child: _gallery(sss),
+                      ),
                       SizedBox(width: 18 * sss),
-                      Expanded(flex: 9, child: _rightSide(sss)),
+                      Expanded(
+                        flex: width < 860 * sss ? 12 : 9,
+                        child: _rightSide(sss),
+                      ),
                     ],
                   ),
                 ),
@@ -275,9 +283,10 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
 
   Widget _gallery(double sss) {
     final d = _details;
-    final images = d?.images.isNotEmpty == true
-        ? d!.images
-        : [if (widget.mod.thumbUrl != null) widget.mod.thumbUrl!];
+    final images =
+        d?.images.isNotEmpty == true
+            ? d!.images
+            : [if (widget.mod.thumbUrl != null) widget.mod.thumbUrl!];
     final full = d?.fullImages.isNotEmpty == true ? d!.fullImages : images;
     final index = images.isEmpty ? 0 : _image.clamp(0, images.length - 1);
     final accent = getAccentColor(ref);
@@ -316,21 +325,34 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
               child:
                   images.isEmpty
                       ? Center(
-                        child: Icon(Icons.image_outlined, size: 40 * sss, color: gbLine),
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 40 * sss,
+                          color: gbLine,
+                        ),
                       )
                       : Stack(
                         fit: StackFit.expand,
                         children: [
                           GestureDetector(
-                            onTap: () => showGbImageViewer(context, full, index),
+                            onTap:
+                                () => showGbImageViewer(context, full, index),
                             child: MouseRegion(
                               cursor: SystemMouseCursors.zoomIn,
-                              child: GbNetworkImage(images[index], fit: BoxFit.cover),
+                              child: GbNetworkImage(
+                                images[index],
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
-                          if (index > 0) arrow(Icons.chevron_left, -1, Alignment.centerLeft),
+                          if (index > 0)
+                            arrow(Icons.chevron_left, -1, Alignment.centerLeft),
                           if (index < images.length - 1)
-                            arrow(Icons.chevron_right, 1, Alignment.centerRight),
+                            arrow(
+                              Icons.chevron_right,
+                              1,
+                              Alignment.centerRight,
+                            ),
                           Positioned(
                             right: 8 * sss,
                             bottom: 8 * sss,
@@ -346,7 +368,11 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.zoom_in, size: 14 * sss, color: Colors.white),
+                                  Icon(
+                                    Icons.zoom_in,
+                                    size: 14 * sss,
+                                    color: Colors.white,
+                                  ),
                                   SizedBox(width: 4 * sss),
                                   Text(
                                     'Click to enlarge  ·  ${index + 1}/${images.length}',
@@ -403,7 +429,11 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
     final d = _details;
     final mod = widget.mod;
     final accent = getAccentColor(ref);
-    final updated = d?.mod.dateUpdated ?? mod.dateUpdated ?? d?.mod.dateAdded ?? mod.dateAdded;
+    final updated =
+        d?.mod.dateUpdated ??
+        mod.dateUpdated ??
+        d?.mod.dateAdded ??
+        mod.dateAdded;
 
     Widget stat(IconData icon, String text) => Padding(
       padding: EdgeInsets.only(right: 14 * sss),
@@ -417,94 +447,135 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
       ),
     );
 
-    final tags = (d?.tags.isNotEmpty == true ? d!.tags : mod.tags).take(8).toList();
+    final tags =
+        (d?.tags.isNotEmpty == true ? d!.tags : mod.tags).take(8).toList();
     final categoryLine = [
       if (_category.isNotEmpty) _category,
       if (mod.subCategoryName.isNotEmpty) mod.subCategoryName,
     ].join('  ›  ');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          mod.name,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: gbText(sss, 17, weight: FontWeight.w600),
-        ),
-        SizedBox(height: 2 * sss),
-        Text(
-          'by ${d?.mod.authorName.isNotEmpty == true ? d!.mod.authorName : mod.authorName}'
-          '${categoryLine.isEmpty ? '' : '   ·   $categoryLine'}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: gbText(sss, 11, color: Colors.white60),
-        ),
-        SizedBox(height: 8 * sss),
+    final headerAndTabs = <Widget>[
+      Text(
+        mod.name,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: gbText(sss, 17, weight: FontWeight.w600),
+      ),
+      SizedBox(height: 2 * sss),
+      Text(
+        'by ${d?.mod.authorName.isNotEmpty == true ? d!.mod.authorName : mod.authorName}'
+        '${categoryLine.isEmpty ? '' : '   ·   $categoryLine'}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: gbText(sss, 11, color: Colors.white60),
+      ),
+      SizedBox(height: 8 * sss),
+      Wrap(
+        runSpacing: 4 * sss,
+        children: [
+          if (d != null)
+            stat(Icons.download_outlined, formatCount(d.downloadCount)),
+          stat(
+            Icons.favorite_border,
+            formatCount(d?.likeCount ?? mod.likeCount),
+          ),
+          stat(
+            Icons.visibility_outlined,
+            formatCount(d?.viewCount ?? mod.viewCount),
+          ),
+          if (updated != null) stat(Icons.update, ageLabel(updated)),
+        ],
+      ),
+      if (tags.isNotEmpty) ...[
+        SizedBox(height: 6 * sss),
         Wrap(
-          runSpacing: 4 * sss,
+          spacing: 5 * sss,
+          runSpacing: 5 * sss,
           children: [
-            if (d != null) stat(Icons.download_outlined, formatCount(d.downloadCount)),
-            stat(Icons.favorite_border, formatCount(d?.likeCount ?? mod.likeCount)),
-            stat(Icons.visibility_outlined, formatCount(d?.viewCount ?? mod.viewCount)),
-            if (updated != null) stat(Icons.update, ageLabel(updated)),
+            for (final t in tags)
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 8 * sss,
+                  vertical: 2 * sss,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(30, 255, 255, 255),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(t, style: gbText(sss, 10, color: Colors.white70)),
+              ),
           ],
         ),
-        if (tags.isNotEmpty) ...[
-          SizedBox(height: 6 * sss),
-          Wrap(
-            spacing: 5 * sss,
-            runSpacing: 5 * sss,
-            children: [
-              for (final t in tags)
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8 * sss, vertical: 2 * sss),
-                  decoration: BoxDecoration(
-                    color: const Color.fromARGB(30, 255, 255, 255),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(t, style: gbText(sss, 10, color: Colors.white70)),
-                ),
-            ],
+      ],
+      SizedBox(height: 10 * sss),
+      Wrap(
+        spacing: 6 * sss,
+        runSpacing: 6 * sss,
+        children: [
+          GbPill(
+            label: 'About',
+            selected: _tab == _Tab.about,
+            onTap: () => setState(() => _tab = _Tab.about),
+          ),
+          GbPill(
+            label: 'Files${d == null ? '' : ' (${d.files.length})'}',
+            selected: _tab == _Tab.files,
+            onTap: () => setState(() => _tab = _Tab.files),
+          ),
+          GbPill(
+            label: 'Credits & license',
+            selected: _tab == _Tab.credits,
+            onTap: () => setState(() => _tab = _Tab.credits),
           ),
         ],
-        SizedBox(height: 10 * sss),
-        Row(
+      ),
+      SizedBox(height: 8 * sss),
+    ];
+
+    Widget bodyBox() => Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(10 * sss),
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(18, 255, 255, 255),
+        borderRadius: BorderRadius.circular(14 * sss),
+      ),
+      child: _tabBody(sss, accent),
+    );
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        // In a short window the facts and text scroll while the footer stays put.
+        final compact = c.maxHeight < 560 * sss;
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ...headerAndTabs,
+                      SizedBox(height: 240 * sss, child: bodyBox()),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 8 * sss),
+              _footer(sss, accent),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            GbPill(
-              label: 'About',
-              selected: _tab == _Tab.about,
-              onTap: () => setState(() => _tab = _Tab.about),
-            ),
-            SizedBox(width: 6 * sss),
-            GbPill(
-              label: 'Files${d == null ? '' : ' (${d.files.length})'}',
-              selected: _tab == _Tab.files,
-              onTap: () => setState(() => _tab = _Tab.files),
-            ),
-            SizedBox(width: 6 * sss),
-            GbPill(
-              label: 'Credits & license',
-              selected: _tab == _Tab.credits,
-              onTap: () => setState(() => _tab = _Tab.credits),
-            ),
+            ...headerAndTabs,
+            Expanded(child: bodyBox()),
+            SizedBox(height: 10 * sss),
+            _footer(sss, accent),
           ],
-        ),
-        SizedBox(height: 8 * sss),
-        Expanded(
-          child: Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(10 * sss),
-            decoration: BoxDecoration(
-              color: const Color.fromARGB(18, 255, 255, 255),
-              borderRadius: BorderRadius.circular(14 * sss),
-            ),
-            child: _tabBody(sss, accent),
-          ),
-        ),
-        SizedBox(height: 10 * sss),
-        _footer(sss, accent),
-      ],
+        );
+      },
     );
   }
 
@@ -537,7 +608,10 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
                   GestureDetector(
                     onTap: r.url.isEmpty ? null : () => gbOpenUrl(r.url),
                     child: MouseRegion(
-                      cursor: r.url.isEmpty ? MouseCursor.defer : SystemMouseCursors.click,
+                      cursor:
+                          r.url.isEmpty
+                              ? MouseCursor.defer
+                              : SystemMouseCursors.click,
                       child: Padding(
                         padding: EdgeInsets.only(bottom: 2 * sss),
                         child: Text(
@@ -547,7 +621,8 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
                             12,
                             color: r.url.isEmpty ? Colors.white : accent,
                           ).copyWith(
-                            decoration: r.url.isEmpty ? null : TextDecoration.underline,
+                            decoration:
+                                r.url.isEmpty ? null : TextDecoration.underline,
                             decorationColor: accent,
                           ),
                         ),
@@ -557,7 +632,10 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
                 SizedBox(height: 10 * sss),
               ],
               if (blocks.isEmpty)
-                Text('No description.', style: gbText(sss, 12, color: Colors.white60))
+                Text(
+                  'No description.',
+                  style: gbText(sss, 12, color: Colors.white60),
+                )
               else
                 GbRichText(blocks),
             ],
@@ -565,11 +643,15 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
         );
       case _Tab.files:
         if (d.files.isEmpty) {
-          return Text('No files.', style: gbText(sss, 12, color: Colors.white60));
+          return Text(
+            'No files.',
+            style: gbText(sss, 12, color: Colors.white60),
+          );
         }
         return ListView(
           children: [
-            for (var i = 0; i < d.files.length; i++) _fileRow(sss, accent, d.files[i], i == 0),
+            for (var i = 0; i < d.files.length; i++)
+              _fileRow(sss, accent, d.files[i], i == 0),
           ],
         );
       case _Tab.credits:
@@ -588,7 +670,10 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
           margin: EdgeInsets.only(bottom: 6 * sss),
           padding: EdgeInsets.all(8 * sss),
           decoration: BoxDecoration(
-            border: Border.all(color: selected ? accent : gbLine, width: 2.5 * sss),
+            border: Border.all(
+              color: selected ? accent : gbLine,
+              width: 2.5 * sss,
+            ),
             borderRadius: BorderRadius.circular(12 * sss),
           ),
           child: Column(
@@ -604,7 +689,15 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
                     ),
                   ),
                   if (newest)
-                    Text('Newest', style: gbText(sss, 10, weight: FontWeight.w600, color: accent)),
+                    Text(
+                      'Newest',
+                      style: gbText(
+                        sss,
+                        10,
+                        weight: FontWeight.w600,
+                        color: accent,
+                      ),
+                    ),
                 ],
               ),
               Text(
@@ -614,7 +707,10 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
               if (f.description.isNotEmpty)
                 Padding(
                   padding: EdgeInsets.only(top: 2 * sss),
-                  child: Text(f.description, style: gbText(sss, 11, color: Colors.white70)),
+                  child: Text(
+                    f.description,
+                    style: gbText(sss, 11, color: Colors.white70),
+                  ),
                 ),
               if (!f.isClean)
                 Padding(
@@ -664,15 +760,28 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (d.credits.isEmpty)
-          Text('No credits listed.', style: gbText(sss, 12, color: Colors.white60)),
+          Text(
+            'No credits listed.',
+            style: gbText(sss, 12, color: Colors.white60),
+          ),
         for (final g in d.credits) ...[
           heading(g.name),
           for (final person in g.people) Text(person, style: gbText(sss, 12)),
         ],
         SizedBox(height: 10 * sss),
         Text('License', style: gbText(sss, 13, weight: FontWeight.w600)),
-        licenseGroup('yes', 'You can', Icons.check_circle_outline, Colors.lightGreenAccent),
-        licenseGroup('ask', 'Ask the author first', Icons.help_outline, Colors.orangeAccent),
+        licenseGroup(
+          'yes',
+          'You can',
+          Icons.check_circle_outline,
+          Colors.lightGreenAccent,
+        ),
+        licenseGroup(
+          'ask',
+          'Ask the author first',
+          Icons.help_outline,
+          Colors.orangeAccent,
+        ),
         licenseGroup('no', 'Not allowed', Icons.block, Colors.redAccent),
         if (d.license.isEmpty)
           Text('Not specified.', style: gbText(sss, 12, color: Colors.white60)),
@@ -696,7 +805,10 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
         if (reason != null)
           Padding(
             padding: EdgeInsets.only(bottom: 6 * sss),
-            child: Text(reason, style: gbText(sss, 11, color: Colors.redAccent)),
+            child: Text(
+              reason,
+              style: gbText(sss, 11, color: Colors.redAccent),
+            ),
           ),
         if (installed != null)
           Padding(
@@ -710,7 +822,8 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
               style: gbText(
                 sss,
                 11,
-                color: _isUpdate ? Colors.orangeAccent : Colors.lightGreenAccent,
+                color:
+                    _isUpdate ? Colors.orangeAccent : Colors.lightGreenAccent,
               ),
             ),
           )
@@ -733,22 +846,30 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
         if (_failed != null)
           Padding(
             padding: EdgeInsets.only(top: 6 * sss),
-            child: Text(_failed!, style: gbText(sss, 11, color: Colors.redAccent)),
+            child: Text(
+              _failed!,
+              style: gbText(sss, 11, color: Colors.redAccent),
+            ),
           ),
         SizedBox(height: 10 * sss),
-        Row(
+        Wrap(
+          alignment: WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8 * sss,
+          runSpacing: 6 * sss,
           children: [
-            GbButton(
-              label: 'GameBanana',
-              icon: Icons.open_in_new,
-              onTap: () => gbOpenUrl(widget.mod.profileUrl),
+            Tooltip(
+              message: 'Open on GameBanana',
+              child: GbButton(
+                label: '',
+                icon: Icons.open_in_new,
+                onTap: () => gbOpenUrl(widget.mod.profileUrl),
+              ),
             ),
-            const Spacer(),
             GbButton(
               label: 'Close',
               onTap: _busy ? null : () => Navigator.of(context).pop(false),
             ),
-            SizedBox(width: 8 * sss),
             GbButton(
               label: _isUpdate ? 'Update' : 'Download',
               primary: true,
@@ -770,11 +891,12 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
         if (g.groupPath == target!.groupPath) group = g;
       }
     }
-    final name = target == null
-        ? 'Loading your groups…'
-        : target.isNew
-        ? 'New group "${target.newName}"${target.newIsUi ? ' (UI group)' : ''}'
-        : (group?.groupName ?? 'Unknown group');
+    final name =
+        target == null
+            ? 'Loading your groups…'
+            : target.isNew
+            ? 'New group "${target.newName}"${target.newIsUi ? ' (UI group)' : ''}'
+            : (group?.groupName ?? 'Unknown group');
     final iconPath = group?.iconPath;
 
     return GestureDetector(
@@ -800,7 +922,9 @@ class _GbDetailsDialogState extends ConsumerState<GbDetailsDialog> {
                   child:
                       target?.isNew == true || iconPath == null
                           ? Icon(
-                            target?.isNew == true ? Icons.add : Icons.folder_outlined,
+                            target?.isNew == true
+                                ? Icons.add
+                                : Icons.folder_outlined,
                             size: 16 * sss,
                             color: Colors.white70,
                           )
