@@ -89,7 +89,20 @@ Layouts are described in words. Before building each screen I will show a mockup
 
 Each release: tests green, `flutter analyze` clean for new code, I show you the screens as in-app-look mockups first, you check it in your real app before I go further.
 
-## Decisions I need from you
+## Decisions (made by the user on 2026-11-19)
+
+1. **Mature content:** leave as it is today. No blur, no hide, no setting. (Removed from the plan.)
+2. **After a download:** NRMM sets the mod up automatically, always (opens the existing Update Mod Data dialog by itself).
+3. **Tab position:** move GameBanana between Mods and Settings. Settings becomes tab 3, so the few upstream spots that test for "tab 2" change to 3.
+4. **Pagination:** numbered pages (first, previous, a window of page numbers, next, last, jump to page) instead of endless scrolling. 20 mods per page (the API allows up to 50).
+
+## Findings while starting (checked live)
+
+- A search cannot be combined with a category: the search endpoint ignores the category filter and the browse endpoint rejects a name filter. So picking a category clears the search box, and searching clears the category.
+- Sub-category chips are moved out of Release 1 (no endpoint lists them; they can only be learned from results).
+- Release 1 also pulls forward the automatic set-up, because it is small.
+
+## Original decision questions (answered above)
 
 1. **Mature content default.** Blur with click-to-reveal (my pick), Hide completely, or Show everything as today?
 2. **After a download:** a "Set up now" button (my pick), set up automatically every time, or leave it manual?
